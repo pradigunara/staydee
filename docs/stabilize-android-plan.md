@@ -528,7 +528,7 @@ so the decision stays reversible.
 | id | scope | acceptance | estimate |
 |---|---|---|---|
 | **M0** | CI + empty app + AAR | GitHub Actions builds a debug APK and fetches the vendored AAR with a sha256 check (§15); Miuix resolves and compiles beside it (§13.2); on-device the app prints `ffmpeg -filters` output containing `vidstabdetect` (also `zscale`, `tonemap`); `ffmpeg -version` shows 16 KB-compatible libs; `ffmpeg -buildconf` + `Packages.getExternalLibraries()` recorded (licence flags; AAR 8.1.9 has no `FFmpegKitConfig.getBuildConfiguration()`). The filters, licence flags, 16 KB alignment and zscale are already **verified statically** on AAR 8.1.9 (§15.2) — **still confirm on device**. **AAR repeatability**: ≥5 transform-only runs (no x264) from one fixed trf at 1080p and 4K, **≥ 60 frames per size**, `framemd5` + PSNR recorded. Implemented as the M0 diagnostics screen (PR #4) | 0.5 d |
-| **M1** | pipeline, no UI polish | pick a file → two-pass → output in cache; **fixed-input trf gate**: give the app a known detection-space trf plus its long edge, let it render at a size with k ≠ 1 (e.g. 1920-edge trf, 3840 render), and require the pass-2 trf it used (exported in debug builds) to be **byte-identical** to the reference's `scale_trf(input, k)` — the same function the CLI's pass 2 uses, so no CLI export is needed; pass-1 trf bytes app vs CLI reported separately as a diagnostic only (they depend on the ffmpeg/vid.stab build); decoded-frame PSNR vs the CLI with the same fixed trf, **clip-bound thresholds from M0** (§15.4: clip A @1920 ≥ 45 dB, clip B @1920 ≥ 73 dB, clip B @3840 ≥ 76 dB; the AAR is not bit-reproducible); peak native memory at 4K × 5 min recorded (§6); progress reported | 1 d |
+| **M1** | pipeline, no UI polish | pick a file → two-pass → output in cache; **fixed-input trf gate (the only hard gate)**: give the app a known detection-space trf plus its long edge, let it render at a size with k ≠ 1 (e.g. 1920-edge trf, 3840 render), and require the pass-2 trf it used (exported in debug builds) to be **byte-identical** to the reference's `scale_trf(input, k)` — the same function the CLI's pass 2 uses, so no CLI export is needed; pass-1 trf bytes app vs CLI reported separately as a diagnostic only (they depend on the ffmpeg/vid.stab build); decoded-frame PSNR vs the CLI with the same fixed trf on M0 clips A and B **recorded as a diagnostic** (average + worst frame), threshold set only from that measurement (§15.4; the AAR is not bit-reproducible and app vs CLI crosses builds); peak native memory at 4K × 5 min recorded (§6); progress reported | 1 d |
 | **M2** | UX | 3 primary knobs + Advanced expander; both entry paths work (PickVisualMedia and the `ACTION_SEND` `video/*` share target, via SAF `content://`, §14.4); foreground service survives screen-off; cancel works mid-pass and between passes | 1 d |
 | **M3** | gallery | result appears in the system gallery under `Movies/Staydee`, correct date, plays; no stale pending items on cancel | 0.5 d |
 | **M4** | geometry | `maxEdge` (default 0) + `detectEdge=auto` + trf rescale; `:core` unit tests (ported) all green, incl. HDR tone-map chain tests; **time estimate (`estimate_seconds`) shown before Run, within ±30% of the actual wall clock** on the reference device at 1080p and 4K; a **≤ 3 min target for a 15 s 4K clip applies only with `maxEdge=1920`** (full-res 4K is ≈5 min per 15 s, §3.3) | 1 d |
@@ -939,16 +939,17 @@ Findings:
   the clip it was measured on.
 - Evidence is weak: 4 pairs per size, average PSNR only (no worst-frame figure), 60 frames.
 
-**Gate decision (recorded, replaces the open "threshold from M0" items in §8/§3.7):**
+**Consequences for M1 (engineering, not an owner decision):**
 
-- M1's **primary gate stays the pass-2 trf byte check** (§8). Rescaling is pure `:core`
-  code and is deterministic, so it is unaffected.
-- The pixel check is **clip-bound**. Compare app vs CLI with the same fixed trf on the
-  same two M0 clips, and pass if PSNR ≥ the M0 minimum for that clip and size minus 3 dB:
-  clip A @1920 ≥ 45 dB; clip B @1920 ≥ 73 dB; clip B @3840 ≥ 76 dB. The 4K threshold is
-  set from this run and is no longer blocked (§3.7). The reference CLI runs a different
-  ffmpeg/vid.stab build, so a miss is first re-checked against AAR-vs-AAR repeatability on
-  that clip before it counts as a port bug.
+- The **only hard M1 gate is the pass-2 trf byte check** (§8). Rescaling is pure `:core`
+  code and is deterministic, so the AAR result does not affect it.
+- The decoded-frame PSNR check (app vs CLI, same fixed trf) is **diagnostic only** for now.
+  M0 measured AAR against AAR (run i vs run 1 of the same build). The app-vs-CLI comparison
+  crosses builds (AAR n8.1.3 vs Termux 9.0.2 + vid.stab 1.1.2) and has never been measured.
+  Four pairs per clip also make "M0 minimum − 3 dB" a weak floor.
+- Step 1 of M1: record app-vs-CLI PSNR (average and worst frame) on clips A and B at each
+  size, next to the AAR-vs-AAR spread above. Only then set a threshold from the measured
+  value, and record it here.
 - Not done: attributing the defect (ffmpeg n8.1.3 vs the bundled vid.stab). The only
   bit-exact stack seen so far is ffmpeg 9.0.2 + vid.stab 1.1.2. Moving to it means
   building FFmpeg with the NDK (§9.2); that is not needed for v1.
