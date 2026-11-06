@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Staydee</string>
+    <string name="notif_channel_jobs">Stabilizing</string>
+    <string name="notif_channel_done">Finished videos</string>
+    <string name="notif_running_title">Staydee is stabilizing your video</string>
+    <string name="notif_stage_probing">Reading video</string>
+    <string name="notif_stage_detecting">Pass 1 of 2: analyzing motion</string>
+    <string name="notif_stage_transforming">Pass 2 of 2: stabilizing</string>
+    <string name="notif_stage_saving">Saving to gallery</string>
+    <string name="notif_cancel">Cancel</string>
+    <string name="notif_done_title">Video stabilized</string>
+    <string name="notif_done_text">%1$s saved to Movies/Staydee</string>
+    <string name="notif_failed_title">Stabilizing failed</string>
+    <string name="job_timed_out">Stopped by the system: background processing time ran out</string>
 </resources>
