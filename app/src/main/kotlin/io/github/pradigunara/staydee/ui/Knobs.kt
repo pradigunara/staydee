@@ -1,0 +1,193 @@
+package io.github.pradigunara.staydee.ui
+
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SliderPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import java.util.Locale
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+
+// Thin wrappers over Miuix (plan §13.3). Screens call these with plain values and lambdas.
+// Sliders keep a local drag value and commit once on release (plan §13.1).
+
+/** Integer slider. [keyPoint] snaps to a special value such as the -1 "off" sentinel. */
+@Composable
+fun IntKnob(
+    title: String,
+    value: Int,
+    range: IntRange,
+    onCommit: (Int) -> Unit,
+    summary: String? = null,
+    keyPoint: Int? = null,
+    valueText: (Int) -> String = { it.toString() },
+) {
+    var drag by remember(value) { mutableFloatStateOf(value.toFloat()) }
+    SliderPreference(
+        value = drag,
+        onValueChange = { drag = it },
+        onValueChangeFinished = { onCommit(drag.roundToInt()) },
+        title = title,
+        summary = summary,
+        valueText = valueText(drag.roundToInt()),
+        valueRange = range.first.toFloat()..range.last.toFloat(),
+        steps = range.last - range.first - 1,
+        keyPoints = listOfNotNull(keyPoint?.toFloat()),
+    )
+}
+
+/** Fractional slider rounded to [decimals] on commit. */
+@Composable
+fun FloatKnob(
+    title: String,
+    value: Double,
+    range: ClosedFloatingPointRange<Double>,
+    decimals: Int,
+    onCommit: (Double) -> Unit,
+    summary: String? = null,
+    keyPoint: Double? = null,
+    valueText: (Double) -> String = { String.format(Locale.ROOT, "%.${decimals}f", it) },
+) {
+    val factor = 10.0.pow(decimals)
+    var drag by remember(value) { mutableFloatStateOf(value.toFloat()) }
+    SliderPreference(
+        value = drag,
+        onValueChange = { drag = it },
+        onValueChangeFinished = { onCommit((drag * factor).toDouble().roundToLong() / factor) },
+        title = title,
+        summary = summary,
+        valueText = valueText(drag.toDouble()),
+        valueRange = range.start.toFloat()..range.endInclusive.toFloat(),
+        steps = 0,
+        keyPoints = listOfNotNull(keyPoint?.toFloat()),
+    )
+}
+
+/** Dropdown over [options]; [selected] and [onSelect] use the index. */
+@Composable
+fun ChoiceKnob(
+    title: String,
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    summary: String? = null,
+) {
+    OverlayDropdownPreference(
+        items = options,
+        selectedIndex = selected,
+        title = title,
+        summary = summary,
+        onSelectedIndexChange = onSelect,
+    )
+}
+
+@Composable
+fun SwitchKnob(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    summary: String? = null,
+) {
+    SwitchPreference(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        title = title,
+        summary = summary,
+    )
+}
+
+@Composable
+fun ArrowKnob(
+    title: String,
+    summary: String? = null,
+    onClick: () -> Unit,
+) {
+    ArrowPreference(title = title, summary = summary, onClick = onClick)
+}
+
+@Composable
+fun PrimaryButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(onClick = onClick, modifier = modifier, enabled = enabled) {
+        Text(text = text)
+    }
+}
+
+@Composable
+fun TextAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    TextButton(text, onClick = onClick, modifier = modifier, enabled = enabled)
+}
+
+/** Scrub bar over 0..1; commit with [onValueChangeFinished]. */
+@Composable
+fun ScrubSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        modifier = modifier,
+        valueRange = 0f..1f,
+        steps = 0,
+    )
+}
+
+/** Determinate bar; indeterminate while [progress] is unknown. */
+@Composable
+fun ProgressBar(progress: Float?, modifier: Modifier = Modifier) {
+    if (progress == null) {
+        InfiniteProgressIndicator(modifier)
+    } else {
+        LinearProgressIndicator(progress = progress, modifier = modifier)
+    }
+}
+
+@Composable
+fun InfoCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier = modifier) { content() }
+}
+
+@Composable
+fun Heading(text: String, modifier: Modifier = Modifier) {
+    SmallTitle(text, modifier = modifier)
+}
+
+@Composable
+fun BodyText(text: String, modifier: Modifier = Modifier) {
+    Text(text = text, modifier = modifier)
+}
+
+@Composable
+fun Caption(text: String, modifier: Modifier = Modifier) {
+    Text(text = text, modifier = modifier, fontSize = 12.sp)
+}
