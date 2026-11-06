@@ -1,0 +1,30 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Fetch FFmpegKit AAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/fetch-aar.sh
+      - name: Test and assemble
+        run: ./gradlew --no-daemon :core:test :app:assembleDebug
+      - uses: actions/upload-artifact@v5
+        with:
+          name: staydee-debug-apk
+          path: app/build/outputs/apk/debug/*.apk

@@ -1,0 +1,75 @@
+import java.security.MessageDigest
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+}
+
+// FFmpegKit is vendored: the AAR is a release asset on our own repo, fetched by
+// scripts/fetch-aar.sh. The build refuses any file whose sha256 does not match.
+val ffmpegKitVersion = libs.versions.ffmpegkit.get()
+val ffmpegKitSha256 = "72094919ac812598ec3f77ba2631e5b2dbd50b1daa98dfa64e9fc565f2b52ede"
+val ffmpegKitAar = layout.projectDirectory.file("libs/ffmpeg-kit-full-gpl-$ffmpegKitVersion.aar")
+
+val verifyFfmpegKit by tasks.registering {
+    val aar = ffmpegKitAar
+    val expected = ffmpegKitSha256
+    inputs.file(aar)
+    doLast {
+        val file = aar.asFile
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        check(actual == expected) { "${file.name}: sha256 $actual, expected $expected" }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(verifyFfmpegKit) }
+
+android {
+    namespace = "io.github.pradigunara.staydee"
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = "io.github.pradigunara.staydee"
+        minSdk = 29
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+        ndk { abiFilters += "arm64-v8a" }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures { compose = true }
+
+    packaging {
+        // the AAR's .so files are already 16 KB aligned; keep them uncompressed
+        jniLibs.useLegacyPackaging = false
+    }
+}
+
+dependencies {
+    implementation(project(":core"))
+    implementation(files(ffmpegKitAar))
+    implementation(libs.smart.exception)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
+}

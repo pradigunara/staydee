@@ -1,0 +1,19 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# vendored binary, fetched by scripts/fetch-aar.sh
+app/libs/*.aar
+
+# local-only reference copy of the CLI (canonical copy is the gist)
+docs/reference/
+
+# local gist clones
+/097fa67734767e131825150ebedd3b95/
+/91ca78d35f773c5e1a502f959d2be47c/
