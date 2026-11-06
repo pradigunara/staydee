@@ -954,3 +954,16 @@ Findings:
 - Not done: attributing the defect (ffmpeg n8.1.3 vs the bundled vid.stab). The only
   bit-exact stack seen so far is ffmpeg 9.0.2 + vid.stab 1.1.2. Moving to it means
   building FFmpeg with the NDK (§9.2); that is not needed for v1.
+
+### 15.5 Gate status (2026-11-07, after PRs #5–#8)
+
+| gate | status | evidence |
+|---|---|---|
+| M1 trf byte check (hard gate) | **passed, off-device** | `TrfReferenceTest`: a real binary TRF1 (static ffmpeg 7.0.2 `vidstabdetect`, 90 frames, 17 616 scaled values, 6 473 half-way ties at k = 1.5) rescaled by `renderTrf` is byte-identical to `stabilize.py` v2.0.8 `scale_trf` at k = 2 and k = 1.5. The pipeline passes exactly `renderTrf(detect, k)` to pass 2; the debug export (`files/debug/pass2.trf`) lets a device run confirm that wiring |
+| M1 app-vs-CLI PSNR (diagnostic) | not run | needs the phone + reference CLI on clips A and B (§15.4) |
+| M1 peak native memory, 4K × 5 min | not run | needs the phone |
+| performance: 15 s 1080p ≤ 120 s with defaults | not run | needs the phone |
+| M2 screen-off survival, cancel mid-pass and between passes | not run | needs the phone |
+| M3 gallery row, date, no stale pending item | not run | needs the phone |
+| M4 estimate within ±30 % at 1080p and 4K | not run | needs the phone; the model was fitted on an older phone, not SM8750 |
+| M5 APK size "≤ 40 MB" | **unit-dependent** | release APK 40 480 483 B: over 40 MB decimal, 38.6 MiB |
