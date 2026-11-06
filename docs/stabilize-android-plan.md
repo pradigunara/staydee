@@ -881,6 +881,7 @@ Reference device: 8-core arm64 Android phone, Termux, thermal throttling present
 | 11 | HDR input (HLG/PQ) | Tone-map to SDR in pass 2 via zscale+tonemap (zimg confirmed in the AAR); app-only step, in `:core` | §4.2, §5 |
 | 12 | entry | In-app `PickVisualMedia` + share target (`ACTION_SEND` `video/*`), both over SAF `content://` | §6, §8 M2, §14.4 |
 | 13 | gallery folder | `Movies/Staydee` (was `Movies/Stabilized`) | §6, §8 M3 |
+| 14 | APK signing | Release key (RSA 4096, alias `staydee`, cert SHA-256 `91:98:7D:6F:…:BB:F0`) kept by the owner outside the repo and in GitHub secrets; CI signs release APKs, a `v*` tag publishes them | README, PR #8 |
 
 ### 15.2 AAR facts (verified 2026-11-07)
 
