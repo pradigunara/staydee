@@ -11,7 +11,7 @@ val ffmpegKitVersion = libs.versions.ffmpegkit.get()
 val ffmpegKitSha256 = "72094919ac812598ec3f77ba2631e5b2dbd50b1daa98dfa64e9fc565f2b52ede"
 val ffmpegKitAar = layout.projectDirectory.file("libs/ffmpeg-kit-full-gpl-$ffmpegKitVersion.aar")
 
-val verifyFfmpegKit by tasks.registering {
+val verifyFfmpegKit = tasks.register("verifyFfmpegKit") {
     val aar = ffmpegKitAar
     val expected = ffmpegKitSha256
     inputs.file(aar)
@@ -33,6 +33,12 @@ val verifyFfmpegKit by tasks.registering {
 
 tasks.named("preBuild") { dependsOn(verifyFfmpegKit) }
 
+// Release signing comes from the environment (CI secrets, or a local export); the keystore never
+// enters the repo. Without STAYDEE_KEYSTORE the release build stays unsigned.
+val releaseKeystore = providers.environmentVariable("STAYDEE_KEYSTORE").orNull
+val releasePassword = providers.environmentVariable("STAYDEE_KEYSTORE_PASSWORD").orNull
+val releaseAlias = providers.environmentVariable("STAYDEE_KEY_ALIAS").orNull
+
 android {
     namespace = "io.github.pradigunara.staydee"
     compileSdk = 37
@@ -46,9 +52,23 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = releasePassword
+                keyAlias = releaseAlias
+                keyPassword = releasePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
