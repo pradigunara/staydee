@@ -35,6 +35,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /** M0 diagnostics (debug builds only): device/AAR report and the transform repeatability check (plan §8). */
 @Composable
@@ -142,20 +144,23 @@ private fun share(context: Context, text: String) {
 }
 
 /**
- * Copy the last job's debug trf export into `Download/Staydee` via MediaStore, so Termux can
- * read it (`~/storage/downloads/Staydee`); Android 11+ hides the app's `Android/data` from it.
+ * Copy the last job's debug trf export into a fresh `Download/Staydee/<timestamp>/` via MediaStore,
+ * so Termux can read it (`~/storage/downloads/Staydee/...`); Android 11+ hides the app's
+ * `Android/data` from it. A new folder per export: MediaStore renames a colliding name to
+ * "name (1)", which would leave an older trf under the expected name.
  */
 private fun exportTrf(context: Context): String {
     val dir = checkNotNull(context.getExternalFilesDir("debug")) { "no external files dir" }
     val files = listOf("last-detect.trf", "last-pass2.trf", "last-trf.json").map { File(dir, it) }
     check(files.all { it.exists() }) { "no trf yet: run one stabilization in this debug build first" }
+    val folder = "Download/Staydee/" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
     val resolver = context.contentResolver
     val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-    for (file in files) {
+    val written = files.map { file ->
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, file.name)
             put(MediaStore.Downloads.MIME_TYPE, if (file.name.endsWith(".json")) "application/json" else "application/octet-stream")
-            put(MediaStore.Downloads.RELATIVE_PATH, "Download/Staydee")
+            put(MediaStore.Downloads.RELATIVE_PATH, folder)
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = checkNotNull(resolver.insert(collection, values)) { "MediaStore refused ${file.name}" }
@@ -166,8 +171,12 @@ private fun exportTrf(context: Context): String {
             resolver.delete(uri, null, null)
             throw t
         }
+        // report the name MediaStore actually stored, not the one requested
+        resolver.query(uri, arrayOf(MediaStore.Downloads.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        } ?: file.name
     }
-    return "exported ${files.joinToString { it.name }} to Download/Staydee"
+    return "exported to $folder: ${written.joinToString()}"
 }
 
 private const val RUNS = 5
