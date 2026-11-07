@@ -16,7 +16,6 @@ import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.github.pradigunara.staydee.MainActivity
 import io.github.pradigunara.staydee.R
@@ -219,12 +218,16 @@ class StabilizeService : Service() {
     }
 
     private fun startForegroundCompat(notification: Notification) {
-        val type = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM -> ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            else -> 0
+        // mediaProcessing exists from API 35; dataSync (API 29+) covers 29-34.
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+        } else {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         }
-        ServiceCompat.startForeground(this, NOTIFICATION_RUNNING, notification, type)
+        // Not ServiceCompat: androidx.core 1.18 masks the type to the API 34 set (0x40000fff),
+        // which turns MEDIA_PROCESSING (0x2000) into "none" and Android 15+ throws
+        // InvalidForegroundServiceTypeException. The 3-arg platform call exists since API 29 = minSdk.
+        startForeground(NOTIFICATION_RUNNING, notification, type)
     }
 
     /** Posts unless the user has denied notifications (API 33+ requires the runtime permission). */
