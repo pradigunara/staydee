@@ -82,6 +82,7 @@ export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
 export SOURCE_DATE_EPOCH=1700000000
 
 CFLAGS_COMMON="-O2 -fPIC -ffile-prefix-map=/cache=."
+# -static, not -static-pie: bionic's static-pie segfaults under qemu-user (even hello-world), and qemu is the verification path.
 LDFLAGS_COMMON="-static -Wl,-z,max-page-size=16384"
 
 fetch() { # url sha256 file
@@ -202,6 +203,15 @@ cp -f ffprobe "$OUT/arm64-v8a/ffprobe"
 "$STRIP" --strip-all "$OUT/arm64-v8a/ffmpeg" "$OUT/arm64-v8a/ffprobe"
 chmod 755 "$OUT/arm64-v8a/ffmpeg" "$OUT/arm64-v8a/ffprobe"
 file "$OUT/arm64-v8a/ffmpeg" "$OUT/arm64-v8a/ffprobe"
+# ---- link-type gate: static ELF (ET_EXEC, no PT_INTERP, 16 KiB LOAD alignment), or fail
+for b in ffmpeg ffprobe; do
+  p=$OUT/arm64-v8a/$b
+  llvm-readelf -h "$p" | grep -E 'Type: +EXEC' >/dev/null || { echo "FATAL: $b is not ET_EXEC" >&2; exit 1; }
+  [ "$(llvm-readelf -l "$p" | grep -c INTERP || true)" = 0 ] || { echo "FATAL: $b has PT_INTERP" >&2; exit 1; }
+  n_bad=$(llvm-readelf -lW "$p" | awk '/ LOAD /{ if ($NF != "0x4000") n++ } END{ print n+0 }')
+  [ "$n_bad" = 0 ] || { echo "FATAL: $b has LOAD alignment != 0x4000" >&2; exit 1; }
+  file "$p" | grep 'statically linked' >/dev/null || { echo "FATAL: file(1) does not report statically linked: $b" >&2; exit 1; }
+done
 
 # ---- verify under qemu (verify.sh exits nonzero on any failed check; BUILDINFO is still written)
 VERIFY_RC=0
@@ -256,6 +266,14 @@ URLs: $FFMPEG_URL , $VIDSTAB_URL , $X264_URL , $ZIMG_URL
 $(cd "$OUT/arm64-v8a" && ls -l ffmpeg ffprobe)
 $(cd "$OUT/arm64-v8a" && sha256sum ffmpeg ffprobe)
 $(file "$OUT/arm64-v8a/ffmpeg" "$OUT/arm64-v8a/ffprobe")
+\`\`\`
+
+## Link type
+
+Static (non-PIE): \`ET_EXEC\`, no \`PT_INTERP\`, \`LOAD\` alignment 0x4000. Enforced by the link gate in \`build.sh\`.
+
+\`\`\`
+$(for b in ffmpeg ffprobe; do echo "== $b"; llvm-readelf -h "$OUT/arm64-v8a/$b" | grep 'Type:'; echo "PT_INTERP segments: $(llvm-readelf -l "$OUT/arm64-v8a/$b" | grep -c INTERP || true)"; llvm-readelf -lW "$OUT/arm64-v8a/$b" | grep ' LOAD '; done)
 \`\`\`
 
 ## \`ffmpeg -version\` (qemu-aarch64)

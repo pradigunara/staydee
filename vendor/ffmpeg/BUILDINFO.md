@@ -38,12 +38,33 @@ URLs: https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz , https://github.com/georg
 ## Binaries
 
 ```
--rwxr-xr-x 1 root root 10754016 Nov  7 02:19 ffmpeg
--rwxr-xr-x 1 root root 10575328 Nov  7 02:19 ffprobe
+-rwxr-xr-x 1 root root 10754016 Nov  7 02:37 ffmpeg
+-rwxr-xr-x 1 root root 10575328 Nov  7 02:37 ffprobe
 db2ea2e46748cd79381e6184431ce92883e75174a1229faef1975816f8899f82  ffmpeg
 4173995859cdaef8222e4d2fa8bc9d83142c3abe45a4063da1be9843e45378e6  ffprobe
 /work/vendor/ffmpeg/arm64-v8a/ffmpeg:  ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, stripped
 /work/vendor/ffmpeg/arm64-v8a/ffprobe: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, stripped
+```
+
+## Link type
+
+Static (non-PIE): `ET_EXEC`, no `PT_INTERP`, `LOAD` alignment 0x4000. Enforced by the link gate in `build.sh`.
+
+```
+== ffmpeg
+  Type:                              EXEC (Executable file)
+PT_INTERP segments: 0
+  LOAD           0x000000 0x0000000000200000 0x0000000000200000 0x174bc0 0x174bc0 R   0x4000
+  LOAD           0x174bc0 0x0000000000378bc0 0x0000000000378bc0 0x8705b4 0x8705b4 R E 0x4000
+  LOAD           0x9e5180 0x0000000000bed180 0x0000000000bed180 0x057f20 0x058e80 RW  0x4000
+  LOAD           0xa3d100 0x0000000000c49100 0x0000000000c49100 0x0041a8 0x3dd8d8 RW  0x4000
+== ffprobe
+  Type:                              EXEC (Executable file)
+PT_INTERP segments: 0
+  LOAD           0x000000 0x0000000000200000 0x0000000000200000 0x16889c 0x16889c R   0x4000
+  LOAD           0x1688c0 0x000000000036c8c0 0x000000000036c8c0 0x851fcc 0x851fcc R E 0x4000
+  LOAD           0x9ba8c0 0x0000000000bc28c0 0x0000000000bc28c0 0x056e90 0x057740 RW  0x4000
+  LOAD           0xa11800 0x0000000000c1d800 0x0000000000c1d800 0x0040a8 0x3dd1d8 RW  0x4000
 ```
 
 ## `ffmpeg -version` (qemu-aarch64)
@@ -211,7 +232,7 @@ x265 [info]: frame B:     71, Avg QP:28.56  kb/s: 2421.46
 x265 [info]: Weighted P-Frames: Y:0.0% UV:0.0%
 x265 [info]: consecutive B-frames: 5.3% 0.0% 0.0% 5.3% 89.5% 
 
-encoded 90 frames in 3.02s (29.79 fps), 2846.89 kb/s, Avg QP:27.65
+encoded 90 frames in 2.68s (33.58 fps), 2846.89 kb/s, Avg QP:27.65
 PASS: test clips created
 == two-pass pipeline: landscape H.264 ==
 PASS: pass 1 (vidstabdetect) landscape
