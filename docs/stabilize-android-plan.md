@@ -1003,6 +1003,13 @@ Clip A: 1080×1920 SDR HEVC (bt709), 452 frames, 15.116 s; default settings in b
 - **Remaining suspects:** ffmpeg 8.1 (AAR, Lavc62) vs 9.0.2, or the AAR's vid.stab (1.1.1 per its
   build script; not visible in the binary) vs 1.1.2. Not separated. That would need another
   build; the 9.0.2 + 1.1.2 build is clean on both counts.
+- **What the spikes are.** Matching app frames against CLI frames: 56 of 452 app frames, about every
+  8th (3, 20, 28, 36, 44, …), show the picture from **~11 frames later** with the current
+  frame's warp applied. They are not swaps: the timestamps increase monotonically, and pass 1
+  decoded correctly (identical motion data). A fixed period and a fixed lag point to a frame buffer
+  recycled while still referenced in pass 2 (decoder pool vs x264 lookahead depth), which is timing
+  dependent and fits the AAR's run-to-run non-determinism (§3.7, §15.4). *Inference:* the faulty
+  code in ffmpeg 8.1 or the AAR's vid.stab is not located.
 
 **Decision:** replace the AAR with the vendored ffmpeg 9.0.2 + vid.stab 1.1.2 binaries (PR #10).
 
@@ -1010,4 +1017,8 @@ Clip A: 1080×1920 SDR HEVC (bt709), 452 frames, 15.116 s; default settings in b
 `libffmpeg.so`/`libffprobe.so` (`useLegacyPackaging = true`, run from `nativeLibraryDir` via
 `ProcessBuilder`) runs clip A with defaults. Its output, copied off the phone, must pass the rule
 above (Y steps > 2 ≤ 112, Y p99 ≤ 9.5, U/V ≤ 2× CLI, residual median ≤ 6.4 px, repeated ≤ 5) and
-show no periodic > 40 px spikes. A second run must stay within the same spread.
+show no periodic > 40 px spikes. A second run must stay within the same spread. No app frame may
+fail to match the CLI frame at the same index or its neighbours (`native/ffmpeg/tools/`, frame
+match, MSE > 500 against i−1, i, i+1). Repeat with a **second clip with a different GOP
+structure** (e.g. a camera-original H.264 or HEVC file, not a TikTok re-encode), so the fix is not
+shown on one stream only.
