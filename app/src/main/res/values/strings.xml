@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Staydee</string>
+    <string name="crash_title">Staydee crashed last time</string>
 
     <string name="notif_channel_jobs">Stabilizing</string>
     <string name="notif_channel_done">Finished videos</string>

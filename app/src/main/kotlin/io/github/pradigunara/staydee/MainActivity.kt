@@ -52,7 +52,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) incoming = sharedVideo(intent)
+        if (savedInstanceState == null) {
+            incoming = sharedVideo(intent)
+            CrashLog.offer(this)
+        }
         setContent {
             StaydeeTheme {
                 App(

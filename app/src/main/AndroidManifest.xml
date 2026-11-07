@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
+        android:name=".StaydeeApp"
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
