@@ -967,3 +967,47 @@ Findings:
 | M3 gallery row, date, no stale pending item | not run | needs the phone |
 | M4 estimate within ±30 % at 1080p and 4K | not run | needs the phone; the model was fitted on an older phone, not SM8750 |
 | M5 APK size "≤ 40 MB" | **unit-dependent** | release APK 40 480 483 B: over 40 MB decimal, 38.6 MiB |
+
+### 15.6 Output flicker on device: cause narrowed to the AAR's pass 2 (2026-11-07)
+
+Symptom (owner, gallery and Compare): brightness/colour pulsing, jitter, stutter on app output.
+Clip A: 1080×1920 SDR HEVC (bt709), 452 frames, 15.116 s; default settings in both app runs.
+
+**Ruled out:**
+- **Motion data.** App detection (`last-detect.trf`) and CLI detection (`--keep-trf`) contain
+  the same 124 175 fields, identical by position, dx/dy, contrast and quality. Only the order
+  inside each frame differs (OpenMP). k = 1: no rescale.
+- **HDR tone-map.** The source is SDR, so the step never ran.
+- **x264.** All 47 SEI options are identical between app and CLI output (core 164, same
+  threads, since both ran on the phone).
+- **The device.** The CLI ran natively on the phone and matches the 9.0.2 qemu render on the desktop.
+- **trf field order.** Two 9.0.2 renders from the app trf and from the CLI trf give the same
+  metrics and 56.2 dB PSNR between them.
+
+**Measured.** `measure.py` on decoded frames; rule fixed before the app was measured:
+
+| video | Y steps > 2 | Y p99 | U / V steps > 1 | residual median px | repeated | frames > 40 px residual |
+|---|---|---|---|---|---|---|
+| source | 57 | 7.21 | — | 15.8 | 2 | 18 (content) |
+| CLI, Termux ffmpeg 9.0.2 + vid.stab 1.1.2 | 75 | 7.52 | 69 / 119 | 4.24 | 0 | 0 |
+| own build 9.0.2 + 1.1.2, app trf (qemu) | 73 | 7.50 | 69 / 120 | 4.12 | 0 | 0 |
+| own build, CLI trf (qemu) | 73 | 7.50 | 69 / 120 | 4.12 | 0 | 0 |
+| app run 1, AAR | **120** | **11.03** | 139 / 173 | 5.39 | 0 | **72**, 2 overlap source |
+| app run 2, AAR | **142** | **13.30** | 134 / 189 | 5.39 | 0 | **75**, 2 overlap source |
+| *rule: worse if* | *> 112* | *> 9.5* | *> 2× CLI* | *> 6.4* | *> 5* | — |
+
+- Both app runs fail brightness, by 45–67 steps over the CLI, against a 22-step spread
+  between the two app runs. U for run 1 (139 vs 138) is within noise.
+- The AAR outputs show **periodic spikes**: pairs of frames every 8 frames (4–5, 12–13, 20–21, …),
+  matching neither the source's high-motion frames nor each other exactly. This is not content.
+- **Remaining suspects:** ffmpeg 8.1 (AAR, Lavc62) vs 9.0.2, or the AAR's vid.stab (1.1.1 per its
+  build script; not visible in the binary) vs 1.1.2. Not separated. That would need another
+  build; the 9.0.2 + 1.1.2 build is clean on both counts.
+
+**Decision:** replace the AAR with the vendored ffmpeg 9.0.2 + vid.stab 1.1.2 binaries (PR #10).
+
+**Acceptance, on the device (qemu renders do not count):** an APK packaging
+`libffmpeg.so`/`libffprobe.so` (`useLegacyPackaging = true`, run from `nativeLibraryDir` via
+`ProcessBuilder`) runs clip A with defaults. Its output, copied off the phone, must pass the rule
+above (Y steps > 2 ≤ 112, Y p99 ≤ 9.5, U/V ≤ 2× CLI, residual median ≤ 6.4 px, repeated ≤ 5) and
+show no periodic > 40 px spikes. A second run must stay within the same spread.
