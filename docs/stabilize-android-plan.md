@@ -1013,6 +1013,14 @@ Clip A: 1080×1920 SDR HEVC (bt709), 452 frames, 15.116 s; default settings in b
   the AAR's vid.stab is not located.
 
 **Decision:** replace the AAR with the vendored ffmpeg 9.0.2 + vid.stab 1.1.2 binaries (PR #10).
+**Wired in PR #11:** FFmpegKit removed everywhere. `vendor/ffmpeg` binaries packaged as
+`lib{ffmpeg,ffprobe}.so` (`useLegacyPackaging = true`), executed from `nativeLibraryDir` via
+`ProcessBuilder`. The picked/shared Uri is opened once per job and given to each run as stdin
+(`redirectInput(/proc/self/fd/N)` in the app), which the tool reads as `/proc/self/fd/0`, a
+seekable file with no copy. Providers that only give a pipe are copied to the job dir. Progress
+comes from `-progress pipe:1` (`out_time_us`); cancel kills the process. The probe rejects video
+codecs the build can't decode (AV1, MPEG-2, ProRes, …) with a readable message. Smoke-tested under
+qemu with exactly this invocation; on-device acceptance as below.
 
 **Acceptance, on the device (qemu renders do not count):** an APK packaging
 `libffmpeg.so`/`libffprobe.so` (`useLegacyPackaging = true`, run from `nativeLibraryDir` via

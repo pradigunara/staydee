@@ -9,9 +9,11 @@ Status: early development. Plan: [docs/stabilize-android-plan.md](docs/stabilize
 Needs JDK 17+ and the Android SDK (compileSdk 37).
 
 ```sh
-sh scripts/fetch-aar.sh          # vendored FFmpegKit AAR (release asset, sha256-checked)
 ./gradlew :core:test :app:assembleDebug
 ```
+
+ffmpeg is bundled: `vendor/ffmpeg/arm64-v8a/{ffmpeg,ffprobe}` (ffmpeg 9.0.2 + vid.stab 1.1.2 + x264 +
+zimg, static arm64), rebuilt with `native/ffmpeg/build.sh`; see `vendor/ffmpeg/BUILDINFO.md`.
 
 The debug APK lands in `app/build/outputs/apk/debug/`.
 
@@ -30,4 +32,4 @@ Keep a backup of the keystore: an APK signed with another key cannot update an i
 
 ## License
 
-GPL-3.0. The bundled FFmpegKit build is configured with `--enable-gpl --enable-version3` (libx264, vid.stab).
+GPL-3.0. The bundled ffmpeg is built with `--enable-gpl` (libx264, vid.stab; GPL-2.0-or-later).
