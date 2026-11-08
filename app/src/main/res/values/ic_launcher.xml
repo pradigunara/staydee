@@ -2,4 +2,6 @@
 <resources>
     <!-- mid-tone of the artwork's navy gradient (#323F61 top-left to #19223B bottom-right) -->
     <color name="ic_launcher_background">#25314E</color>
+    <!-- the artwork's blue swirl; tints the notification icon -->
+    <color name="brand_blue">#4570E7</color>
 </resources>
