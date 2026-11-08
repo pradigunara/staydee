@@ -7,6 +7,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.ColorDrawable
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -17,6 +19,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import io.github.pradigunara.staydee.MainActivity
 import io.github.pradigunara.staydee.R
 import io.github.pradigunara.staydee.gallery.GallerySaver
@@ -51,6 +54,15 @@ class StabilizeService : Service() {
     }
 
     private val lock = Any()
+
+    /** The colour app icon for the notification's large-icon slot; the small icon can only be a
+     *  one-colour silhouette. Built once from the adaptive icon layers (API 26+, minSdk 29). */
+    private val largeIcon by lazy {
+        AdaptiveIconDrawable(
+            ColorDrawable(getColor(R.color.ic_launcher_background)),
+            ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground),
+        ).toBitmap(LARGE_ICON_PX, LARGE_ICON_PX)
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile
@@ -172,6 +184,8 @@ class StabilizeService : Service() {
     private fun buildRunning(act: Active, stage: JobState.Stage, progress: Float?): Notification =
         NotificationCompat.Builder(this, CHANNEL_JOBS)
             .setSmallIcon(R.drawable.ic_stat_staydee)
+            .setColor(getColor(R.color.brand_blue))
+            .setLargeIcon(largeIcon)
             .setContentTitle(getString(R.string.notif_running_title))
             .setContentText(getString(stageText(stage)))
             .setContentIntent(openAppIntent())
@@ -197,7 +211,13 @@ class StabilizeService : Service() {
                 .setAutoCancel(true)
             is JobState.Idle, is JobState.Running, is JobState.Cancelled -> return
         }
-        notifySafely(NOTIFICATION_OUTCOME, notification.setSmallIcon(R.drawable.ic_stat_staydee).build())
+        notifySafely(
+            NOTIFICATION_OUTCOME,
+            notification.setSmallIcon(R.drawable.ic_stat_staydee)
+                .setColor(getColor(R.color.brand_blue))
+                .setLargeIcon(largeIcon)
+                .build(),
+        )
     }
 
     private fun viewIntent(done: JobState.Done): PendingIntent {
@@ -248,6 +268,7 @@ class StabilizeService : Service() {
         private const val REQUEST_CANCEL = 1
         private const val REQUEST_VIEW = 2
         private const val PROGRESS_MAX = 1000
+        private const val LARGE_ICON_PX = 256
         private const val NOTIFY_INTERVAL_MS = 1000L
 
         private fun stageText(stage: JobState.Stage): Int = when (stage) {
