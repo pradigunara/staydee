@@ -4,11 +4,6 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.FFmpegKitConfig
-import com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback
-import com.arthenica.ffmpegkit.ReturnCode
-import com.arthenica.ffmpegkit.StatisticsCallback
 import io.github.pradigunara.staydee.BuildConfig
 import io.github.pradigunara.staydee.core.containerFor
 import io.github.pradigunara.staydee.core.creationTime
@@ -22,13 +17,11 @@ import io.github.pradigunara.staydee.core.renderTrf
 import io.github.pradigunara.staydee.core.scaleIfShrinking
 import io.github.pradigunara.staydee.core.transformArgs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.ZoneId
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /** A finished render waiting in the cache, not yet in the gallery. */
 data class PipelineResult(
@@ -45,15 +38,13 @@ data class PipelineResult(
 /** Directory holding every intermediate file of the running job. */
 fun jobDir(context: Context): File = File(context.cacheDir, "job")
 
-private const val LOG_TAIL_CHARS = 1500
-
 /**
- * Probe, detect (pass 1), rescale the transforms, render (pass 2). Pure runner: no service or UI
- * knowledge. Cancelling the calling coroutine cancels the running ffmpeg session.
+ * Probe, detect (pass 1), rescale the transforms, render (pass 2) with the bundled ffmpeg. Pure
+ * runner: no service or UI knowledge. Cancelling the calling coroutine kills the running process.
  *
  * [onPlan] gets the model estimate in seconds once the source is probed (null when the duration is
  * unknown). [onStage] gets the stage and overall progress (0..1, null while the duration is unknown);
- * it is called from ffmpeg's statistics thread as well as the caller's.
+ * it is called from the tool's stdout reader thread as well as the caller's.
  */
 suspend fun runPipeline(
     context: Context,
@@ -66,8 +57,20 @@ suspend fun runPipeline(
     check(dir.mkdirs()) { "cannot create ${dir.path}" }
 
     onStage(JobState.Stage.PROBING, null)
-    val source = probe(context, request.src)
-    ensureActive()
+    // One opened source for every run: each run reopens it through /proc/self/fd, with its own offset.
+    InputSource.open(context, request.src, dir).use { input -> render(context, request, dir, input, onStage, onPlan) }
+}
+
+private suspend fun render(
+    context: Context,
+    request: StabilizeRequest,
+    dir: File,
+    input: InputSource,
+    onStage: (JobState.Stage, Float?) -> Unit,
+    onPlan: (estimateSeconds: Double?) -> Unit,
+): PipelineResult {
+    val source = parseProbe(probeJson(context, input), displayName(context, request.src))
+    currentCoroutineContext().ensureActive()
 
     val warnings = mutableListOf<String>()
     val reconciled = request.settings.reconciled()
@@ -100,13 +103,10 @@ suspend fun runPipeline(
     fun fraction(timeMs: Double): Float? = duration?.let { (timeMs / 1000.0 / it).toFloat().coerceIn(0f, 1f) }
 
     onStage(JobState.Stage.DETECTING, if (duration != null) 0f else null)
-    runFfmpeg(
-        // SAF descriptors are single-use, so each session asks for a fresh one.
-        detectArgs(FFmpegKitConfig.getSafParameterForRead(context, request.src), settings, detectTrf.path, detectPreScale),
-    ) { timeMs ->
+    runFfmpeg(context, input, detectArgs(input.arg, settings, detectTrf.path, detectPreScale), "pass 1") { timeMs ->
         onStage(JobState.Stage.DETECTING, fraction(timeMs)?.let { it * weights.detect.toFloat() })
     }
-    ensureActive()
+    currentCoroutineContext().ensureActive()
 
     val detectBytes = detectTrf.readBytes()
     val pass2Bytes = renderTrf(detectBytes, geometry.k)
@@ -114,8 +114,10 @@ suspend fun runPipeline(
 
     onStage(JobState.Stage.TRANSFORMING, if (duration != null) weights.detect.toFloat() else null)
     runFfmpeg(
+        context,
+        input,
         transformArgs(
-            src = FFmpegKitConfig.getSafParameterForRead(context, request.src),
+            src = input.arg,
             out = out.path,
             s = settings,
             trf = pass2Trf.path,
@@ -125,47 +127,38 @@ suspend fun runPipeline(
             hasAudio = source.hasAudio,
             creationTime = created,
         ),
+        "pass 2",
     ) { timeMs ->
         onStage(
             JobState.Stage.TRANSFORMING,
             fraction(timeMs)?.let { (weights.detect + it * weights.transform).toFloat() },
         )
     }
-    ensureActive()
+    currentCoroutineContext().ensureActive()
     check(out.length() > 0) { "ffmpeg wrote no output" }
 
     if (BuildConfig.DEBUG) exportDebugTrf(context, detectBytes, pass2Bytes, geometry.target, renderLong, geometry.k)
 
-    PipelineResult(out, ext, mimeFor(ext), displayName, created, warnings)
+    return PipelineResult(out, ext, mimeFor(ext), displayName, created, warnings)
 }
 
 /**
- * Run one ffmpeg session. [argv] is the `:core` argv, which starts with the literal `ffmpeg`; FFmpegKit
- * takes the arguments only, so that is dropped and `-y` is added. [onTimeMs] receives the output position
- * in milliseconds. Cancelling the coroutine cancels the session.
+ * Run one ffmpeg pass. [argv] is the `:core` argv, which starts with the literal `ffmpeg`: that is
+ * replaced by the bundled binary, and `-y` plus `-progress pipe:1 -nostats` are added, as the
+ * reference CLI's `run_stage` does. [onTimeMs] receives the output position in milliseconds.
  */
-private suspend fun runFfmpeg(argv: List<String>, onTimeMs: (Double) -> Unit) {
-    val args = (listOf("-y") + argv.drop(1)).toTypedArray()
-    suspendCancellableCoroutine<Unit> { cont ->
-        val session = FFmpegKit.executeWithArgumentsAsync(
-            args,
-            FFmpegSessionCompleteCallback { finished ->
-                val code = finished.returnCode
-                when {
-                    ReturnCode.isSuccess(code) -> cont.resume(Unit)
-                    ReturnCode.isCancel(code) -> cont.cancel()
-                    else -> cont.resumeWithException(
-                        IllegalStateException(
-                            "ffmpeg failed ($code):\n${finished.allLogsAsString.orEmpty().takeLast(LOG_TAIL_CHARS)}",
-                        ),
-                    )
-                }
-            },
-            null,
-            StatisticsCallback { stats -> onTimeMs(stats.time) },
-        )
-        cont.invokeOnCancellation { FFmpegKit.cancel(session.sessionId) }
-    }
+private suspend fun runFfmpeg(
+    context: Context,
+    input: InputSource,
+    argv: List<String>,
+    what: String,
+    onTimeMs: (Double) -> Unit,
+) {
+    val args = listOf("-y", "-progress", "pipe:1", "-nostats") + argv.drop(1)
+    runTool(NativeTools.ffmpeg(context), args, stdin = input) { line ->
+        // ffmpeg prints out_time_us in microseconds ("N/A" before the first frame)
+        if (line.startsWith("out_time_us=")) line.substringAfter('=').toLongOrNull()?.let { onTimeMs(it / 1000.0) }
+    }.requireSuccess(what)
 }
 
 /** Local `YYYY-MM-DDTHH:MM:SS` of the source's modification time, when MediaStore can tell. */

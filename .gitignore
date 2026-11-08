@@ -8,9 +8,6 @@ captures/
 .externalNativeBuild/
 .cxx/
 
-# vendored binary, fetched by scripts/fetch-aar.sh
-app/libs/*.aar
-
 # local-only reference copy of the CLI (canonical copy is the gist)
 docs/reference/
 
