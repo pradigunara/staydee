@@ -527,8 +527,8 @@ so the decision stays reversible.
 
 | id | scope | acceptance | estimate |
 |---|---|---|---|
-| **M0** | CI + empty app + AAR | GitHub Actions builds a debug APK and fetches the vendored AAR with a sha256 check (§15); Miuix resolves and compiles beside it (§13.2); on-device the app prints `ffmpeg -filters` output containing `vidstabdetect` (also `zscale`, `tonemap`); `ffmpeg -version` shows 16 KB-compatible libs; `FFmpegKitConfig.getBuildConfiguration()` recorded (licence flags). The filters, licence flags, 16 KB alignment and zscale are already **verified statically** on AAR 8.1.9 (§15.2) — **still confirm on device**. **AAR repeatability**: ≥5 transform-only runs (no x264) from one fixed trf at 1080p and 4K, **≥ 60 frames per size**, `framemd5` + PSNR recorded | 0.5 d |
-| **M1** | pipeline, no UI polish | pick a file → two-pass → output in cache; **fixed-input trf gate**: give the app a known detection-space trf plus its long edge, let it render at a size with k ≠ 1 (e.g. 1920-edge trf, 3840 render), and require the pass-2 trf it used (exported in debug builds) to be **byte-identical** to the reference's `scale_trf(input, k)` — the same function the CLI's pass 2 uses, so no CLI export is needed; pass-1 trf bytes app vs CLI reported separately as a diagnostic only (they depend on the ffmpeg/vid.stab build); at **1080p** decoded-frame PSNR vs the CLI with the same fixed trf, threshold from M0 repeatability (bit-identical expected on a deterministic stack); **no 4K pixel gate** until M0 measures the AAR (§3.7); peak native memory at 4K × 5 min recorded (§6); progress reported | 1 d |
+| **M0** | CI + empty app + AAR | GitHub Actions builds a debug APK and fetches the vendored AAR with a sha256 check (§15); Miuix resolves and compiles beside it (§13.2); on-device the app prints `ffmpeg -filters` output containing `vidstabdetect` (also `zscale`, `tonemap`); `ffmpeg -version` shows 16 KB-compatible libs; `ffmpeg -buildconf` + `Packages.getExternalLibraries()` recorded (licence flags; AAR 8.1.9 has no `FFmpegKitConfig.getBuildConfiguration()`). The filters, licence flags, 16 KB alignment and zscale are already **verified statically** on AAR 8.1.9 (§15.2) — **still confirm on device**. **AAR repeatability**: ≥5 transform-only runs (no x264) from one fixed trf at 1080p and 4K, **≥ 60 frames per size**, `framemd5` + PSNR recorded. Implemented as the M0 diagnostics screen (PR #4) | 0.5 d |
+| **M1** | pipeline, no UI polish | pick a file → two-pass → output in cache; **fixed-input trf gate (the only hard gate)**: give the app a known detection-space trf plus its long edge, let it render at a size with k ≠ 1 (e.g. 1920-edge trf, 3840 render), and require the pass-2 trf it used (exported in debug builds) to be **byte-identical** to the reference's `scale_trf(input, k)` — the same function the CLI's pass 2 uses, so no CLI export is needed; pass-1 trf bytes app vs CLI reported separately as a diagnostic only (they depend on the ffmpeg/vid.stab build); decoded-frame PSNR vs the CLI with the same fixed trf on M0 clips A and B **recorded as a diagnostic** (average + worst frame), threshold set only from that measurement (§15.4; the AAR is not bit-reproducible and app vs CLI crosses builds); peak native memory at 4K × 5 min recorded (§6); progress reported | 1 d |
 | **M2** | UX | 3 primary knobs + Advanced expander; both entry paths work (PickVisualMedia and the `ACTION_SEND` `video/*` share target, via SAF `content://`, §14.4); foreground service survives screen-off; cancel works mid-pass and between passes | 1 d |
 | **M3** | gallery | result appears in the system gallery under `Movies/Staydee`, correct date, plays; no stale pending items on cancel | 0.5 d |
 | **M4** | geometry | `maxEdge` (default 0) + `detectEdge=auto` + trf rescale; `:core` unit tests (ported) all green, incl. HDR tone-map chain tests; **time estimate (`estimate_seconds`) shown before Run, within ±30% of the actual wall clock** on the reference device at 1080p and 4K; a **≤ 3 min target for a 15 s 4K clip applies only with `maxEdge=1920`** (full-res 4K is ≈5 min per 15 s, §3.3) | 1 d |
@@ -881,6 +881,7 @@ Reference device: 8-core arm64 Android phone, Termux, thermal throttling present
 | 11 | HDR input (HLG/PQ) | Tone-map to SDR in pass 2 via zscale+tonemap (zimg confirmed in the AAR); app-only step, in `:core` | §4.2, §5 |
 | 12 | entry | In-app `PickVisualMedia` + share target (`ACTION_SEND` `video/*`), both over SAF `content://` | §6, §8 M2, §14.4 |
 | 13 | gallery folder | `Movies/Staydee` (was `Movies/Stabilized`) | §6, §8 M3 |
+| 14 | APK signing | Release key (RSA 4096, alias `staydee`, cert SHA-256 `91:98:7D:6F:…:BB:F0`) kept by the owner outside the repo and in GitHub secrets; CI signs release APKs, a `v*` tag publishes them | README, PR #8 |
 
 ### 15.2 AAR facts (verified 2026-11-07)
 
@@ -901,8 +902,132 @@ These are static findings; M0 re-confirms them on device (§8).
 
 ### 15.3 Still open after these decisions
 
-- Exact vid.stab version in the AAR (≥ 1.1.1 only); AAR repeatability at 1080p and 4K (M0).
+- Exact vid.stab version in the AAR (≥ 1.1.1 only).
 - Peak native memory at 4K × 5 min (M1/M4); pass/fail threshold not set.
 - Estimate model (≈138 s per 15 s 4K, §14.4) vs measured ≈5 min (§3.3): unreconciled; the ±30% gate (M4) forces a recalibration.
 - HDR tone-map chain operator/`npl`/colour tags unvalidated (§4.2).
 - §3.2 pass-1 cost discrepancy (1.4 s vs 1.06 s per 30 frames) unresolved.
+
+### 15.4 M0 results on device (2026-11-07)
+
+Device: vivo I2401, Snapdragon SM8750, Android 17 (API 37), 4 KB pages. App: M0 diagnostics
+build (PR #4), AAR 8.1.9.
+
+**Static checks, all confirmed on device:** ffmpeg `n8.1.3`; `-buildconf` has `--enable-gpl
+--enable-version3 --enable-libx264 --enable-libvidstab --enable-libzimg`; filters
+`vidstabdetect`, `vidstabtransform`, `scale`, `unsharp`, `zscale`, `tonemap` present; `libx264`
+encoder present; `vidstabdetect` has `fileformat` (binary TRF1). The device uses 4 KB pages, so
+16 KB support stays verified statically only (§15.2, `zipalign -c -P 16`).
+
+**Repeatability.** Default settings, no unsharp, no x264, one fixed trf per size, detection
+at the render size (k = 1), 5 runs × 60 frames, FFV1 + framemd5, file-vs-file PSNR (average)
+against run 1:
+
+| clip | render long edge | distinct outputs | frames differing per run | PSNR vs run 1 |
+|---|---|---|---|---|
+| A: 1080p source, 452 frames | 1920 | 5 of 5 | 59–60 | 48.2 – 53.0 dB |
+| B: 4K source, 182 frames | 1920 (downscaled) | 5 of 5 | 59–60 | 76.8 – 81.0 dB |
+| B: 4K source, 182 frames | 3840 | 5 of 5 | 59–60 | 79.0 – 84.1 dB |
+
+Findings:
+
+- **The AAR's `vidstabtransform` is not bit-reproducible at either size.** Nearly every frame
+  differs in every run. Do not claim "same input ⇒ same output" (§3.7).
+- **There is no size dependence on this build.** Clip B fails at 1920 and at 3840 with
+  similar PSNR. This differs from the phone 8.1.2 + 1.1.1 and desktop 7.0.2 builds (§3.7).
+- **The size of the difference depends on the content.** At the same 1920 edge, clip A gives
+  48–53 dB and clip B gives 77–81 dB. A single fixed threshold is therefore only valid for
+  the clip it was measured on.
+- Evidence is weak: 4 pairs per size, average PSNR only (no worst-frame figure), 60 frames.
+
+**Consequences for M1 (engineering, not an owner decision):**
+
+- The **only hard M1 gate is the pass-2 trf byte check** (§8). Rescaling is pure `:core`
+  code and is deterministic, so the AAR result does not affect it.
+- The decoded-frame PSNR check (app vs CLI, same fixed trf) is **diagnostic only** for now.
+  M0 measured AAR against AAR (run i vs run 1 of the same build). The app-vs-CLI comparison
+  crosses builds (AAR n8.1.3 vs Termux 9.0.2 + vid.stab 1.1.2) and has never been measured.
+  Four pairs per clip also make "M0 minimum − 3 dB" a weak floor.
+- Step 1 of M1: record app-vs-CLI PSNR (average and worst frame) on clips A and B at each
+  size, next to the AAR-vs-AAR spread above. Only then set a threshold from the measured
+  value, and record it here.
+- Not done: attributing the defect (ffmpeg n8.1.3 vs the bundled vid.stab). The only
+  bit-exact stack seen so far is ffmpeg 9.0.2 + vid.stab 1.1.2. Moving to it means
+  building FFmpeg with the NDK (§9.2); that is not needed for v1.
+
+### 15.5 Gate status (2026-11-07, after PRs #5–#8)
+
+| gate | status | evidence |
+|---|---|---|
+| M1 trf byte check (hard gate) | **passed, off-device** | `TrfReferenceTest`: a real binary TRF1 (static ffmpeg 7.0.2 `vidstabdetect`, 90 frames, 17 616 scaled values, 6 473 half-way ties at k = 1.5) rescaled by `renderTrf` is byte-identical to `stabilize.py` v2.0.8 `scale_trf` at k = 2 and k = 1.5. The pipeline passes exactly `renderTrf(detect, k)` to pass 2; the debug export (`files/debug/pass2.trf`) lets a device run confirm that wiring |
+| M1 app-vs-CLI PSNR (diagnostic) | not run | needs the phone + reference CLI on clips A and B (§15.4) |
+| M1 peak native memory, 4K × 5 min | not run | needs the phone |
+| performance: 15 s 1080p ≤ 120 s with defaults | not run | needs the phone |
+| M2 screen-off survival, cancel mid-pass and between passes | not run | needs the phone |
+| M3 gallery row, date, no stale pending item | not run | needs the phone |
+| M4 estimate within ±30 % at 1080p and 4K | not run | needs the phone; the model was fitted on an older phone, not SM8750 |
+| M5 APK size "≤ 40 MB" | **unit-dependent** | release APK 40 480 483 B: over 40 MB decimal, 38.6 MiB |
+
+### 15.6 Output flicker on device: cause narrowed to the AAR's pass 2 (2026-11-07)
+
+Symptom (owner, gallery and Compare): brightness/colour pulsing, jitter, stutter on app output.
+Clip A: 1080×1920 SDR HEVC (bt709), 452 frames, 15.116 s; default settings in both app runs.
+
+**Ruled out:**
+- **Motion data.** App detection (`last-detect.trf`) and CLI detection (`--keep-trf`) contain
+  the same 124 175 fields, identical by position, dx/dy, contrast and quality. Only the order
+  inside each frame differs (OpenMP). k = 1: no rescale.
+- **HDR tone-map.** The source is SDR, so the step never ran.
+- **x264.** All 47 SEI options are identical between app and CLI output (core 164, same
+  threads, since both ran on the phone).
+- **The device.** The CLI ran natively on the phone and matches the 9.0.2 qemu render on the desktop.
+- **trf field order.** Two 9.0.2 renders from the app trf and from the CLI trf give the same
+  metrics and 56.2 dB PSNR between them.
+
+**Measured.** `measure.py` on decoded frames; rule fixed before the app was measured:
+
+| video | Y steps > 2 | Y p99 | U / V steps > 1 | residual median px | repeated | frames > 40 px residual |
+|---|---|---|---|---|---|---|
+| source | 57 | 7.21 | — | 15.8 | 2 | 18 (content) |
+| CLI, Termux ffmpeg 9.0.2 + vid.stab 1.1.2 | 75 | 7.52 | 69 / 119 | 4.24 | 0 | 0 |
+| own build 9.0.2 + 1.1.2, app trf (qemu) | 73 | 7.50 | 69 / 120 | 4.12 | 0 | 0 |
+| own build, CLI trf (qemu) | 73 | 7.50 | 69 / 120 | 4.12 | 0 | 0 |
+| app run 1, AAR | **120** | **11.03** | 139 / 173 | 5.39 | 0 | **72**, 2 overlap source |
+| app run 2, AAR | **142** | **13.30** | 134 / 189 | 5.39 | 0 | **75**, 2 overlap source |
+| *rule: worse if* | *> 112* | *> 9.5* | *> 2× CLI* | *> 6.4* | *> 5* | — |
+
+- Both app runs fail brightness, by 45–67 steps over the CLI, against a 22-step spread
+  between the two app runs. U for run 1 (139 vs 138) is within noise.
+- The AAR outputs show **periodic spikes**: pairs of frames every 8 frames (4–5, 12–13, 20–21, …),
+  matching neither the source's high-motion frames nor each other exactly. This is not content.
+- **Remaining suspects:** ffmpeg 8.1 (AAR, Lavc62) vs 9.0.2, or the AAR's vid.stab (1.1.1 per its
+  build script; not visible in the binary) vs 1.1.2. Not separated. That would need another
+  build; the 9.0.2 + 1.1.2 build is clean on both counts.
+- **What the spikes are.** `framematch.py` (app output against CLI output): run 2 has 56 of 452
+  frames, about every 8th (3, 20, 28, 36, 44, …), showing the picture from **~11 frames later**
+  with the current frame's warp applied; run 1 has 64 such frames with a lag of **~6**. Our 9.0.2
+  build has 0. They are not swaps: the timestamps increase monotonically, and pass 1 decoded
+  correctly (identical motion data). A fixed period with a lag that varies between runs points to
+  a frame buffer recycled while still referenced in pass 2, which is timing dependent and fits the
+  AAR's run-to-run non-determinism (§3.7, §15.4). *Inference:* the faulty code in ffmpeg 8.1 or
+  the AAR's vid.stab is not located.
+
+**Decision:** replace the AAR with the vendored ffmpeg 9.0.2 + vid.stab 1.1.2 binaries (PR #10).
+**Wired in PR #11:** FFmpegKit removed everywhere. `vendor/ffmpeg` binaries packaged as
+`lib{ffmpeg,ffprobe}.so` (`useLegacyPackaging = true`), executed from `nativeLibraryDir` via
+`ProcessBuilder`. The picked/shared Uri is opened once per job and given to each run as stdin
+(`redirectInput(/proc/self/fd/N)` in the app), which the tool reads as `/proc/self/fd/0`, a
+seekable file with no copy. Providers that only give a pipe are copied to the job dir. Progress
+comes from `-progress pipe:1` (`out_time_us`); cancel kills the process. The probe rejects video
+codecs the build can't decode (AV1, MPEG-2, ProRes, …) with a readable message. Smoke-tested under
+qemu with exactly this invocation; on-device acceptance as below.
+
+**Acceptance, on the device (qemu renders do not count):** an APK packaging
+`libffmpeg.so`/`libffprobe.so` (`useLegacyPackaging = true`, run from `nativeLibraryDir` via
+`ProcessBuilder`) runs clip A with defaults. Its output, copied off the phone, must pass the rule
+above (Y steps > 2 ≤ 112, Y p99 ≤ 9.5, U/V ≤ 2× CLI, residual median ≤ 6.4 px, repeated ≤ 5) and
+show no periodic > 40 px spikes. A second run must stay within the same spread. No app frame may
+fail to match the CLI frame at the same index or its neighbours (`native/ffmpeg/tools/`, frame
+match, MSE > 500 against i−1, i, i+1). Repeat with a **second clip with a different GOP
+structure** (e.g. a camera-original H.264 or HEVC file, not a TikTok re-encode), so the fix is not
+shown on one stream only.
