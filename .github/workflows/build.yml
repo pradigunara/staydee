@@ -19,10 +19,6 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v5
-      - name: Fetch FFmpegKit AAR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh scripts/fetch-aar.sh
       - name: Release keystore
         env:
           KEYSTORE_B64: ${{ secrets.STAYDEE_KEYSTORE_B64 }}
