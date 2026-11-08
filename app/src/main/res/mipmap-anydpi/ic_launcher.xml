@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon (minSdk 29 > 26, so no legacy bitmaps). The artwork sits at 90% of the
+     108 dp canvas: its tile lands just inside the ~66 dp the launcher mask shows, and the
+     artwork's own edge stays outside it. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <!-- Android 13+ themed icons -->
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

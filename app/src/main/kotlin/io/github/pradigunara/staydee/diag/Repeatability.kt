@@ -1,7 +1,7 @@
 package io.github.pradigunara.staydee.diag
 
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import io.github.pradigunara.staydee.pipeline.requireSuccess
+import io.github.pradigunara.staydee.pipeline.runTool
 import java.io.File
 
 /**
@@ -12,6 +12,7 @@ import java.io.File
  * every run also writes a framemd5 so per-frame identity is exact.
  */
 class Repeatability(
+    private val ffmpeg: File,
     private val workDir: File,
     private val log: (String) -> Unit,
 ) {
@@ -33,7 +34,7 @@ class Repeatability(
         val deterministic get() = distinctHashes == 1
     }
 
-    fun measure(src: String, label: String, chains: Chains, runs: Int = 5, frames: Int = 60): SizeResult {
+    suspend fun measure(src: String, label: String, chains: Chains, runs: Int = 5, frames: Int = 60): SizeResult {
         val dir = File(workDir, label).apply { deleteRecursively(); mkdirs() }
         val trf = File(dir, "detect.trf").path
         log("[$label] pass 1")
@@ -73,13 +74,9 @@ class Repeatability(
     private fun frameHashes(md5: File): List<String> =
         md5.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { it.substringAfterLast(',').trim() }
 
-    private fun ffmpeg(vararg args: String): String {
-        val session = FFmpegKit.executeWithArguments(arrayOf("-hide_banner", "-nostdin", "-y", *args))
-        val logs = session.allLogsAsString.orEmpty()
-        if (ReturnCode.isCancel(session.returnCode)) throw InterruptedException("cancelled")
-        check(ReturnCode.isSuccess(session.returnCode)) { "ffmpeg failed (${session.returnCode}):\n${logs.takeLast(2000)}" }
-        return logs
-    }
+    /** Run the bundled ffmpeg; returns its log tail, where the psnr summary lands. */
+    private suspend fun ffmpeg(vararg args: String): String =
+        runTool(ffmpeg, listOf("-hide_banner", "-nostdin", "-y", *args)).requireSuccess("ffmpeg").stderrTail
 
     private companion object {
         val PSNR_AVG = Regex("""PSNR .*?average:(\S+)""")

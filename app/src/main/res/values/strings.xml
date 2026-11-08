@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Staydee</string>
+    <string name="crash_title">Staydee crashed last time</string>
 
     <string name="notif_channel_jobs">Stabilizing</string>
     <string name="notif_channel_done">Finished videos</string>
@@ -16,6 +17,8 @@
     <string name="job_timed_out">Stopped by the system: background processing time ran out</string>
 
     <string name="choose_video">Choose video</string>
+    <string name="choose_other_video">Choose another video</string>
+    <string name="heading_video">Video</string>
     <string name="source_none">Pick a video, or share one to Staydee from your gallery.</string>
     <string name="source_reading">Reading video…</string>
     <string name="source_unreadable">Can\'t read this video: %1$s</string>

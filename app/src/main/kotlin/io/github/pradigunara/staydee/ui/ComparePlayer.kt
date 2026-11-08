@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -145,11 +145,6 @@ fun ComparePlayerScreen(source: Uri, result: Uri, onBack: () -> Unit) {
                     Pane(resPlayer, stabilizedLabel, Modifier.weight(1f))
                 }
             }
-            TextAction(
-                text = stringResource(if (playing) R.string.compare_pause else R.string.compare_play),
-                onClick = { toggle() },
-                modifier = Modifier.fillMaxWidth(),
-            )
             ScrubSlider(
                 value = shown,
                 onValueChange = { scrub = it },
@@ -160,7 +155,12 @@ fun ComparePlayerScreen(source: Uri, result: Uri, onBack: () -> Unit) {
                     positionMs = target
                     scrub = null
                 },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = CARD_INSET).padding(top = 12.dp),
+            )
+            SecondaryButton(
+                text = stringResource(if (playing) R.string.compare_pause else R.string.compare_play),
+                onClick = { toggle() },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = CARD_INSET, vertical = 12.dp),
             )
         }
     }
@@ -169,7 +169,7 @@ fun ComparePlayerScreen(source: Uri, result: Uri, onBack: () -> Unit) {
 @Composable
 private fun Pane(player: Player, label: String, modifier: Modifier) {
     Column(modifier) {
-        Caption(label, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+        Caption(label, Modifier.padding(horizontal = CARD_INSET, vertical = 6.dp))
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
