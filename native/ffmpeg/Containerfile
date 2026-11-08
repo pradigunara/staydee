@@ -1,0 +1,25 @@
+# Build image for the static Android arm64 ffmpeg/ffprobe (see build.sh).
+#
+#   podman build --cpu-period=100000 --cpu-quota=160000 \
+#     -t localhost/staydee-ffmpeg-build:1 -f native/ffmpeg/Containerfile native/ffmpeg
+#
+# (--cpu-quota=160000 with --cpu-period=100000 == --cpus=1.6, ~40% of 4 cores.)
+FROM localhost/staydee-android:37
+
+ENV DEBIAN_FRONTEND=noninteractive
+# cmake/autotools/pkg-config: upstream build systems.
+# qemu-user: runs the aarch64 binaries for smoke tests.
+# ffmpeg (host-arch Ubuntu package): ONLY used to synthesise test clips in verify.sh;
+#   the vendored binaries never come from this package.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      cmake pkg-config autoconf automake libtool curl xz-utils ca-certificates \
+      qemu-user make git python3 file ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
+# Pinned NDK r29 (stable, 29.0.14206865).
+ARG NDK_VERSION=29.0.14206865
+ENV ANDROID_NDK_HOME=/opt/android-sdk-linux/ndk/${NDK_VERSION}
+RUN yes | sdkmanager --licenses >/dev/null 2>&1 || true \
+ && sdkmanager "ndk;${NDK_VERSION}" \
+ && test -x "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"

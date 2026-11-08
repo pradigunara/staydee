@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Staydee</string>
+    <string name="crash_title">Staydee crashed last time</string>
+
+    <string name="notif_channel_jobs">Stabilizing</string>
+    <string name="notif_channel_done">Finished videos</string>
+    <string name="notif_running_title">Staydee is stabilizing your video</string>
+    <string name="notif_stage_probing">Reading video</string>
+    <string name="notif_stage_detecting">Pass 1 of 2: analyzing motion</string>
+    <string name="notif_stage_transforming">Pass 2 of 2: stabilizing</string>
+    <string name="notif_stage_saving">Saving to gallery</string>
+    <string name="notif_cancel">Cancel</string>
+    <string name="notif_done_title">Video stabilized</string>
+    <string name="notif_done_text">%1$s saved to Movies/Staydee</string>
+    <string name="notif_failed_title">Stabilizing failed</string>
+    <string name="job_timed_out">Stopped by the system: background processing time ran out</string>
+
+    <string name="choose_video">Choose video</string>
+    <string name="choose_other_video">Choose another video</string>
+    <string name="heading_video">Video</string>
+    <string name="source_none">Pick a video, or share one to Staydee from your gallery.</string>
+    <string name="source_reading">Reading video…</string>
+    <string name="source_unreadable">Can\'t read this video: %1$s</string>
+    <string name="source_dimensions">%1$d × %2$d</string>
+    <string name="source_duration">Duration %1$s</string>
+    <string name="source_hdr">HDR input: tone-mapped to SDR</string>
+    <string name="estimate_value">Estimated time: about %1$s</string>
+    <string name="estimate_unknown">Estimated time unavailable: the file does not report its duration</string>
+    <string name="duration_seconds">%1$d s</string>
+    <string name="duration_minutes_seconds">%1$d min %2$d s</string>
+
+    <string name="heading_stabilize">Stabilize</string>
+    <string name="knob_shakiness">Shakiness</string>
+    <string name="knob_shakiness_summary">How much camera shake to remove</string>
+    <string name="knob_smoothing">Smoothing</string>
+    <string name="knob_smoothing_summary">Higher gives a smoother camera path</string>
+    <string name="knob_crf">Quality (CRF)</string>
+    <string name="knob_crf_summary">Lower is better quality and a larger file</string>
+    <string name="advanced_open">Advanced</string>
+    <string name="advanced_summary">Accuracy, zoom, borders, output</string>
+    <string name="run">Stabilize</string>
+
+    <string name="running_title">Stabilizing…</string>
+    <string name="stage_probing">Reading video</string>
+    <string name="stage_detecting">Analyzing motion (pass 1 of 2)</string>
+    <string name="stage_transforming">Stabilizing (pass 2 of 2)</string>
+    <string name="stage_saving">Saving to gallery</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="done_title">Done</string>
+    <string name="done_saved">Saved to Movies/Staydee</string>
+    <string name="done_took">Took %1$s</string>
+    <string name="open">Open</string>
+    <string name="compare">Compare</string>
+    <string name="share">Share</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="share_chooser">Share video</string>
+    <string name="no_app_for_video">No app can open this video</string>
+    <string name="failed_title">Stabilization failed</string>
+    <string name="cancelled_title">Cancelled</string>
+    <string name="diagnostics">Diagnostics (debug)</string>
+
+    <string name="compare_title">Compare</string>
+    <string name="compare_original">Original</string>
+    <string name="compare_stabilized">Stabilized</string>
+    <string name="compare_play">Play</string>
+    <string name="compare_pause">Pause</string>
+
+    <string name="advanced_title">Advanced</string>
+    <string name="value_off">off</string>
+    <string name="knob_accuracy">Accuracy</string>
+    <string name="knob_accuracy_summary">Raised to shakiness when lower</string>
+    <string name="knob_stepsize">Search step size</string>
+    <string name="knob_mincontrast">Minimum contrast</string>
+    <string name="knob_zoom">Zoom</string>
+    <string name="knob_maxshift">Max shift (px)</string>
+    <string name="knob_maxangle">Max angle (rad)</string>
+    <string name="knob_zoomspeed">Zoom speed</string>
+    <string name="knob_optzoom">Optimal zoom</string>
+    <string name="knob_optalgo">Path algorithm</string>
+    <string name="knob_border">Borders</string>
+    <string name="knob_interpol">Interpolation</string>
+    <string name="knob_detect_edge">Analysis resolution</string>
+    <string name="knob_max_edge">Max output size</string>
+    <string name="knob_sharpen">Sharpen</string>
+    <string name="knob_sharpen_summary">Light unsharp mask after stabilizing</string>
+    <string name="knob_tripod">Tripod mode</string>
+    <string name="knob_tripod_summary">Locks the frame; smoothing is ignored</string>
+    <string name="knob_audio">Keep original audio</string>
+    <string name="knob_audio_summary">Off re-encodes audio to AAC 192k</string>
+    <string name="knob_preset">Encoder preset</string>
+    <string name="knob_preset_summary">Barely changes size or quality; CRF matters more</string>
+
+    <string-array name="optzoom_options">
+        <item>Off</item>
+        <item>Static</item>
+        <item>Adaptive</item>
+    </string-array>
+    <string-array name="optalgo_options">
+        <item>Gaussian</item>
+        <item>Optimal</item>
+        <item>Average</item>
+    </string-array>
+    <string-array name="border_options">
+        <item>Keep</item>
+        <item>Black</item>
+    </string-array>
+    <string-array name="interpol_options">
+        <item>None</item>
+        <item>Linear</item>
+        <item>Bilinear</item>
+        <item>Bicubic</item>
+    </string-array>
+    <string-array name="detect_edge_options">
+        <item>Auto</item>
+        <item>Off</item>
+    </string-array>
+    <string-array name="max_edge_options">
+        <item>Full resolution</item>
+        <item>1920 px long edge</item>
+        <item>2560 px long edge</item>
+        <item>3840 px long edge</item>
+    </string-array>
+</resources>
