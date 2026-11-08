@@ -13,6 +13,7 @@ import io.github.pradigunara.staydee.core.estimateSeconds
 import io.github.pradigunara.staydee.core.localTimestamp
 import io.github.pradigunara.staydee.core.outputPath
 import io.github.pradigunara.staydee.core.progressWeights
+import io.github.pradigunara.staydee.core.renderLongEdge
 import io.github.pradigunara.staydee.core.renderTrf
 import io.github.pradigunara.staydee.core.scaleIfShrinking
 import io.github.pradigunara.staydee.core.transformArgs
@@ -78,7 +79,7 @@ private suspend fun render(
     warnings += reconciled.warnings
 
     val srcLong = source.longEdge
-    val renderLong = if (settings.maxEdge > 0) minOf(srcLong, settings.maxEdge) else srcLong
+    val renderLong = renderLongEdge(srcLong, settings.maxEdge)
     val renderScale = scaleIfShrinking(renderLong, srcLong)
     val geometry = detectGeometry(renderLong, settings.detectEdge, binaryTrf = true)
     val detectPreScale = scaleIfShrinking(geometry.target, srcLong)

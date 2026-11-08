@@ -1031,3 +1031,50 @@ fail to match the CLI frame at the same index or its neighbours (`native/ffmpeg/
 match, MSE > 500 against i−1, i, i+1). Repeat with a **second clip with a different GOP
 structure** (e.g. a camera-original H.264 or HEVC file, not a TikTok re-encode), so the fix is not
 shown on one stream only.
+
+### 15.7 Smoothing in seconds; knobs reset on every launch (2026-11-09)
+
+**What `smoothing` is** (vid.stab 1.1.2 `transform.c`, `cameraPathGaussian`): relative transforms are
+summed into an absolute camera path, low-pass filtered with a Gaussian over `2·s + 1` frames
+(weights `exp(−(Δ/(s/2))²)`: 0.37 at s/2, 0.02 at the window edge), and each frame is shifted by
+smoothed − actual. The unit is **frames**, so the same value covers half the time at 60 fps. `s = 0`
+skips the filter: every motion is cancelled ("static camera", ffmpeg docs), not "no smoothing".
+Larger values lag pans and need more `optzoom` crop.
+
+**Sane range:** ffmpeg docs default 10, our 9.0.2 build's and the CLI's default 15, common recipes 30
+(StackOverflow, GoPro scripts, ffmpeg-cookbook); one GoPro write-up found 30 "wobbly", 10 good.
+Nothing above 30 found; 1000 is only the filter maximum.
+
+**Decision (owner):** the main slider is **0.2–2.0 s in 0.1 s steps, default 0.5 s**, converted per clip
+with `smoothingFrames(seconds, fps)` (`:core`; clip fps from ffprobe `avg_frame_rate`, else
+`r_frame_rate`, else 30; result clamped to 1–1000, never 0). 0.5 s = 15 frames at 30 fps (unchanged)
+and 30 at 60 fps. Values below 0.2 s (about 6 frames at 30 fps) were cut: the blur would reach about
+±3 frames, too short to average hand shake. Static camera stays available as Tripod mode. `:core`
+and the CLI keep `smoothing` in frames, 0–1000.
+
+**Decision (owner):** knobs are **not persisted**. Each launch starts from the defaults so one clip's
+tuning doesn't carry over to the next video; `EditorState` (ViewModel) keeps them across rotation
+within a session. `SettingsStore` was removed.
+
+### 15.8 Quality: automatic CRF by output resolution (2026-11-09)
+
+The right CRF depends on resolution. HandBrake docs (x264/x265): RF 19–23 for 720p, 20–24 for 1080p,
+22–28 for 2160p, because at higher resolution "any loss is a smaller percent of the whole". ffmpeg
+H.264 wiki: sane range 17–28, 17–18 visually lossless, +6 roughly halves the size. CRF does not change
+encode time (§3.1). A fixed 22 is right at 1080p and spends size at 4K.
+
+**Decision (owner):** the main screen has a **Quality** choice instead of a raw CRF slider:
+`autoCrf(renderLong, level)` in `:core`, keyed on the **output** long edge (`renderLongEdge`: source,
+limited by Max output size):
+
+| render long edge | Smaller file | Balanced (default) | Higher quality |
+|---|---|---|---|
+| ≤ 1280 | 23 | 21 | 19 |
+| ≤ 1920 | 24 | **22** (unchanged) | 20 |
+| ≤ 2560 | 25 | 23 | 21 |
+| > 2560 | 27 | 25 | 23 |
+
+All values lie inside HandBrake's range for the class. The summary shows the CRF the clip will get.
+Advanced has "Set CRF manually" (0–51), starting from the automatic value; while it is on, Quality
+shows "Manual CRF N". `:core` `Settings.crf` and the CLI are unchanged; the app sets `crf` per clip
+when a job starts.

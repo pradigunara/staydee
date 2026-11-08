@@ -26,6 +26,10 @@ fun AdvancedSheet(
     show: Boolean,
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
+    crfOverride: Int?,
+    /** The automatic CRF for the current clip; the starting value when switching to manual. */
+    autoCrf: Int?,
+    onCrfOverrideChange: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val off = stringResource(R.string.value_off)
@@ -144,6 +148,21 @@ fun AdvancedSheet(
                 summary = stringResource(R.string.knob_audio_summary),
                 onCheckedChange = { onSettingsChange(settings.copy(audio = it)) },
             )
+            SwitchKnob(
+                title = stringResource(R.string.knob_crf_manual),
+                checked = crfOverride != null,
+                summary = stringResource(R.string.knob_crf_manual_summary),
+                onCheckedChange = { onCrfOverrideChange(if (it) autoCrf ?: settings.crf else null) },
+            )
+            if (crfOverride != null) {
+                IntKnob(
+                    title = stringResource(R.string.knob_crf),
+                    value = crfOverride,
+                    range = 0..51,
+                    summary = stringResource(R.string.knob_crf_summary),
+                    onCommit = { onCrfOverrideChange(it) },
+                )
+            }
             ChoiceKnob(
                 title = stringResource(R.string.knob_preset),
                 options = X264_PRESETS,

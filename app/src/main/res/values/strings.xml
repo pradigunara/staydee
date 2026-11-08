@@ -34,9 +34,20 @@
     <string name="knob_shakiness">Shakiness</string>
     <string name="knob_shakiness_summary">How much camera shake to remove</string>
     <string name="knob_smoothing">Smoothing</string>
-    <string name="knob_smoothing_summary">Higher gives a smoother camera path</string>
-    <string name="knob_crf">Quality (CRF)</string>
-    <string name="knob_crf_summary">Lower is better quality and a larger file</string>
+    <string name="knob_smoothing_summary">Time the camera path is averaged over. Longer is smoother but lags pans and zooms in more</string>
+    <string name="knob_quality">Quality</string>
+    <string name="quality_auto">Picks the CRF for the output resolution</string>
+    <string name="quality_auto_clip">CRF %1$d for this %2$d px output</string>
+    <string name="quality_manual">Manual CRF %1$d (set in Advanced)</string>
+    <string-array name="quality_options">
+        <item>Smaller file</item>
+        <item>Balanced</item>
+        <item>Higher quality</item>
+    </string-array>
+    <string name="knob_crf">CRF</string>
+    <string name="knob_crf_summary">Lower is better quality and a larger file; +6 is about half the size</string>
+    <string name="knob_crf_manual">Set CRF manually</string>
+    <string name="knob_crf_manual_summary">Off: Quality on the main screen picks it per resolution</string>
     <string name="advanced_open">Advanced</string>
     <string name="advanced_summary">Accuracy, zoom, borders, output</string>
     <string name="run">Stabilize</string>

@@ -18,10 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.pradigunara.staydee.core.SMOOTHING_SECONDS_RANGE
+import java.util.Locale
 import io.github.pradigunara.staydee.R
 import io.github.pradigunara.staydee.core.Settings
 import io.github.pradigunara.staydee.pipeline.JobState
 import io.github.pradigunara.staydee.pipeline.Probe
+import androidx.compose.ui.res.stringArrayResource
+import io.github.pradigunara.staydee.core.QualityLevel
 
 /** Everything the main screen shows. Plain data; the screen never reads repositories itself. */
 data class MainUi(
@@ -32,6 +36,15 @@ data class MainUi(
     /** Estimate for a run with [settings]; null when the duration is unknown. */
     val estimateSeconds: Double?,
     val settings: Settings,
+    /** Main-screen smoothing in seconds; converted to frames of the clip when a job starts. */
+    val smoothingSeconds: Double,
+    val quality: QualityLevel,
+    /** Exact CRF from Advanced; null = automatic. */
+    val crfOverride: Int?,
+    /** Output long edge of the probed clip; null until probed. */
+    val renderLong: Int?,
+    /** CRF [quality] means for this clip; null until probed. */
+    val autoCrf: Int?,
     val job: JobState,
 )
 
@@ -44,6 +57,9 @@ fun MainScreen(
     ui: MainUi,
     onPick: () -> Unit,
     onSettingsChange: (Settings) -> Unit,
+    onSmoothingChange: (Double) -> Unit,
+    onQualityChange: (QualityLevel) -> Unit,
+    onCrfOverrideChange: (Int?) -> Unit,
     onRun: () -> Unit,
     onCancel: () -> Unit,
     onOpen: () -> Unit,
@@ -66,6 +82,8 @@ fun MainScreen(
                     ui = ui,
                     onPick = onPick,
                     onSettingsChange = onSettingsChange,
+                    onSmoothingChange = onSmoothingChange,
+                    onQualityChange = onQualityChange,
                     onRun = onRun,
                     onAdvanced = { showAdvanced = true },
                     onDiagnostics = onDiagnostics,
@@ -80,6 +98,9 @@ fun MainScreen(
             show = showAdvanced,
             settings = ui.settings,
             onSettingsChange = onSettingsChange,
+            crfOverride = ui.crfOverride,
+            autoCrf = ui.autoCrf,
+            onCrfOverrideChange = onCrfOverrideChange,
             onDismiss = { showAdvanced = false },
         )
     }
@@ -90,6 +111,8 @@ private fun IdleForm(
     ui: MainUi,
     onPick: () -> Unit,
     onSettingsChange: (Settings) -> Unit,
+    onSmoothingChange: (Double) -> Unit,
+    onQualityChange: (QualityLevel) -> Unit,
     onRun: () -> Unit,
     onAdvanced: () -> Unit,
     onDiagnostics: (() -> Unit)?,
@@ -107,19 +130,22 @@ private fun IdleForm(
             summary = stringResource(R.string.knob_shakiness_summary),
             onCommit = { onSettingsChange(s.copy(shakiness = it)) },
         )
-        IntKnob(
+        FloatKnob(
             title = stringResource(R.string.knob_smoothing),
-            value = s.smoothing,
-            range = 0..1000,
+            value = ui.smoothingSeconds,
+            range = SMOOTHING_SECONDS_RANGE,
+            decimals = 1,
+            steps = 17, // 0.2 … 2.0 s in 0.1 s steps
             summary = stringResource(R.string.knob_smoothing_summary),
-            onCommit = { onSettingsChange(s.copy(smoothing = it)) },
+            valueText = { String.format(Locale.ROOT, "%.1f s", it) },
+            onCommit = onSmoothingChange,
         )
-        IntKnob(
-            title = stringResource(R.string.knob_crf),
-            value = s.crf,
-            range = 0..51,
-            summary = stringResource(R.string.knob_crf_summary),
-            onCommit = { onSettingsChange(s.copy(crf = it)) },
+        ChoiceKnob(
+            title = stringResource(R.string.knob_quality),
+            options = stringArrayResource(R.array.quality_options).toList(),
+            selected = ui.quality.ordinal,
+            summary = qualitySummary(ui),
+            onSelect = { onQualityChange(QualityLevel.entries[it]) },
         )
         ArrowKnob(
             title = stringResource(R.string.advanced_open),
@@ -148,6 +174,18 @@ private fun IdleForm(
         if (onDiagnostics != null) {
             TextAction(text = stringResource(R.string.diagnostics), onClick = onDiagnostics, modifier = Modifier.fillMaxWidth())
         }
+    }
+}
+
+@Composable
+private fun qualitySummary(ui: MainUi): String {
+    val manual = ui.crfOverride
+    val auto = ui.autoCrf
+    val edge = ui.renderLong
+    return when {
+        manual != null -> stringResource(R.string.quality_manual, manual)
+        auto != null && edge != null -> stringResource(R.string.quality_auto_clip, auto, edge)
+        else -> stringResource(R.string.quality_auto)
     }
 }
 
