@@ -32,6 +32,7 @@ fun DiagnosticsScreen(
     onRepeatability: () -> Unit,
     onCancel: () -> Unit,
     onShare: () -> Unit,
+    onExportTrf: () -> Unit,
 ) {
     StaydeeScreen(title = title) { padding ->
         Column(
@@ -52,6 +53,13 @@ fun DiagnosticsScreen(
             } else {
                 TextButton("Pick clip and run", onClick = onRepeatability, modifier = Modifier.fillMaxWidth().padding(12.dp))
             }
+            SmallTitle("Last job's transforms")
+            Text(
+                "Copies last-detect.trf, last-pass2.trf and last-trf.json from the last stabilization " +
+                    "to Download/Staydee, for comparing against the reference CLI.",
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            TextButton("Export trf to Downloads", onClick = onExportTrf, modifier = Modifier.fillMaxWidth().padding(12.dp))
             if (state.log.isNotEmpty()) {
                 MonoCard(state.log)
                 TextButton("Share results", onClick = onShare, enabled = !state.running, modifier = Modifier.fillMaxWidth().padding(12.dp))

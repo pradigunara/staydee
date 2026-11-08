@@ -3,6 +3,7 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -18,13 +19,43 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v5
-      - name: Fetch FFmpegKit AAR
+      - name: Release keystore
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh scripts/fetch-aar.sh
+          KEYSTORE_B64: ${{ secrets.STAYDEE_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "STAYDEE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
       - name: Test and assemble
-        run: ./gradlew --no-daemon :core:test :app:assembleDebug
+        env:
+          STAYDEE_KEYSTORE_PASSWORD: ${{ secrets.STAYDEE_KEYSTORE_PASSWORD }}
+          STAYDEE_KEY_ALIAS: ${{ secrets.STAYDEE_KEY_ALIAS }}
+        run: ./gradlew --no-daemon :core:test :app:assembleDebug :app:assembleRelease
       - uses: actions/upload-artifact@v5
         with:
           name: staydee-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v5
+        with:
+          name: staydee-release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+  # tag pushes (v*) publish the signed APK as a GitHub release: the sideload channel (plan §15)
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: staydee-release-apk
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk="staydee-${GITHUB_REF_NAME}.apk"
+          mv app-release.apk "$apk"
+          gh release create "$GITHUB_REF_NAME" "$apk" --repo "$GITHUB_REPOSITORY" --title "Staydee $GITHUB_REF_NAME" --generate-notes
