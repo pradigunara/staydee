@@ -65,7 +65,7 @@ fun IntKnob(
     )
 }
 
-/** Fractional slider rounded to [decimals] on commit. */
+/** Fractional slider rounded to [decimals] on commit; [steps] snap points between the ends (0 = continuous). */
 @Composable
 fun FloatKnob(
     title: String,
@@ -75,6 +75,7 @@ fun FloatKnob(
     onCommit: (Double) -> Unit,
     summary: String? = null,
     keyPoint: Double? = null,
+    steps: Int = 0,
     valueText: (Double) -> String = { String.format(Locale.ROOT, "%.${decimals}f", it) },
 ) {
     val factor = 10.0.pow(decimals)
@@ -82,12 +83,12 @@ fun FloatKnob(
     SliderPreference(
         value = drag,
         onValueChange = { drag = it },
-        onValueChangeFinished = { onCommit((drag * factor).toDouble().roundToLong() / factor) },
+        onValueChangeFinished = { onCommit((drag * factor).roundToLong() / factor) },
         title = title,
         summary = summary,
         valueText = valueText(drag.toDouble()),
         valueRange = range.start.toFloat()..range.endInclusive.toFloat(),
-        steps = 0,
+        steps = steps,
         keyPoints = listOfNotNull(keyPoint?.toFloat()),
     )
 }

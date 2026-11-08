@@ -15,6 +15,8 @@ data class Probe(
     val height: Int,
     /** Seconds; null when the container does not say. */
     val durationSeconds: Double?,
+    /** Average frames per second; null when the stream does not say. Converts smoothing seconds to frames. */
+    val fps: Double?,
     val transfer: ColorTransfer,
     val hasAudio: Boolean,
     /** `format.tags.creation_time` verbatim, if present. */
@@ -60,11 +62,19 @@ internal fun parseProbe(json: JSONObject, displayName: String): Probe {
         width = video.optInt("width").also { check(it > 0) { "video width unknown" } },
         height = video.optInt("height").also { check(it > 0) { "video height unknown" } },
         durationSeconds = format?.optString("duration")?.toDoubleOrNull()?.takeIf { it > 0 },
+        fps = frameRate(video.optString("avg_frame_rate")) ?: frameRate(video.optString("r_frame_rate")),
         transfer = ColorTransfer.fromFfprobe(video.optString("color_transfer").takeIf { it.isNotEmpty() }),
         hasAudio = all.any { it.optString("codec_type") == "audio" },
         creationTimeTag = format?.optJSONObject("tags")?.optString("creation_time")?.takeIf { it.isNotEmpty() },
         displayName = displayName,
     )
+}
+
+/** ffprobe's "30000/1001" form; null for "0/0" and anything unparsable. */
+private fun frameRate(text: String): Double? {
+    val (num, den) = text.split('/').takeIf { it.size == 2 }?.map { it.toDoubleOrNull() } ?: return null
+    if (num == null || den == null || num <= 0 || den <= 0) return null
+    return num / den
 }
 
 internal fun displayName(context: Context, uri: Uri): String =

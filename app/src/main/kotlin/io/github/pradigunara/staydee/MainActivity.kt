@@ -14,6 +14,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
@@ -32,6 +33,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.pradigunara.staydee.core.Settings
 import io.github.pradigunara.staydee.core.detectGeometry
 import io.github.pradigunara.staydee.core.estimateSeconds
+import io.github.pradigunara.staydee.core.autoCrf
+import io.github.pradigunara.staydee.core.renderLongEdge
+import io.github.pradigunara.staydee.core.smoothingFrames
 import io.github.pradigunara.staydee.pipeline.JobRepository
 import io.github.pradigunara.staydee.pipeline.JobState
 import io.github.pradigunara.staydee.pipeline.Probe
@@ -44,7 +48,7 @@ import io.github.pradigunara.staydee.ui.StaydeeTheme
 
 /** Entry point: pick or share one video, run one stabilization, then open, share or compare the result. */
 class MainActivity : ComponentActivity() {
-    private val settingsStore by lazy { SettingsStore(this) }
+    private val editor: EditorState by viewModels()
 
     /** A video handed over by ACTION_SEND, waiting for the composition to take it. */
     private var incoming by mutableStateOf<Uri?>(null)
@@ -61,7 +65,7 @@ class MainActivity : ComponentActivity() {
                 App(
                     incoming = incoming,
                     onIncomingConsumed = { incoming = null },
-                    settingsStore = settingsStore,
+                    editor = editor,
                 )
             }
         }
@@ -83,12 +87,13 @@ class MainActivity : ComponentActivity() {
 private enum class Screen { MAIN, COMPARE, DIAGNOSTICS }
 
 @Composable
-private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, settingsStore: SettingsStore) {
+private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, editor: EditorState) {
     val context = LocalContext.current
     val job by JobRepository.state.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.MAIN) }
     var source by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var settings by remember { mutableStateOf(settingsStore.load()) }
+    val settings = editor.settings
+    val smoothingSeconds = editor.smoothingSeconds
 
     LaunchedEffect(incoming) {
         val uri = incoming ?: return@LaunchedEffect
@@ -110,17 +115,25 @@ private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, settingsStore: S
 
     val done = job as? JobState.Done
     val probed = probeResult?.getOrNull()
+    val renderLong = probed?.let { renderLongEdge(it.longEdge, settings.maxEdge) }
     val ui = MainUi(
         source = source,
         probe = probed,
         probeError = probeResult?.exceptionOrNull()?.let { it.message ?: it.toString() },
         estimateSeconds = probed?.let { estimateFor(it, settings) },
         settings = settings,
+        smoothingSeconds = smoothingSeconds,
+        quality = editor.quality,
+        crfOverride = editor.crfOverride,
+        renderLong = renderLong,
+        autoCrf = renderLong?.let { autoCrf(it, editor.quality) },
         job = job,
     )
 
     val onRun: () -> Unit = {
-        source?.let { src ->
+        val src = source
+        val clip = probed
+        if (src != null && clip != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
@@ -128,7 +141,11 @@ private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, settingsStore: S
                 // The foreground service runs without the permission; only its notification is hidden.
                 notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-            JobRepository.start(context, StabilizeRequest(src, settings.reconciled().settings))
+            // Smoothing is set in seconds, quality as a level; vid.stab and x264 want frames and a
+            // CRF for this clip (plan §15.7, §15.8).
+            val crf = editor.crfOverride ?: autoCrf(renderLongEdge(clip.longEdge, settings.maxEdge), editor.quality)
+            val run = settings.copy(smoothing = smoothingFrames(smoothingSeconds, clip.fps), crf = crf)
+            JobRepository.start(context, StabilizeRequest(src, run.reconciled().settings))
         }
     }
     val openDiagnostics: () -> Unit = { screen = Screen.DIAGNOSTICS }
@@ -146,10 +163,10 @@ private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, settingsStore: S
         else -> MainScreen(
             ui = ui,
             onPick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) },
-            onSettingsChange = {
-                settings = it
-                settingsStore.save(it)
-            },
+            onSettingsChange = { editor.settings = it },
+            onSmoothingChange = { editor.smoothingSeconds = it },
+            onQualityChange = { editor.quality = it },
+            onCrfOverrideChange = { editor.crfOverride = it },
             onRun = onRun,
             onCancel = { JobRepository.cancel(context) },
             onOpen = { done?.let { openVideo(context, it.result) } },
@@ -164,7 +181,7 @@ private fun App(incoming: Uri?, onIncomingConsumed: () -> Unit, settingsStore: S
 /** Model estimate for a run of [p] with [s]; null when the container does not report a duration. */
 private fun estimateFor(p: Probe, s: Settings): Double? {
     val duration = p.durationSeconds ?: return null
-    val renderLong = if (s.maxEdge in 1 until p.longEdge) s.maxEdge else p.longEdge
+    val renderLong = renderLongEdge(p.longEdge, s.maxEdge)
     val detectLong = detectGeometry(renderLong, s.detectEdge).target
     return estimateSeconds(duration, renderLong, detectLong)
 }
