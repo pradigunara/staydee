@@ -1,8 +1,31 @@
 # Staydee
 
-Local video stabilization for Android: two-pass FFmpeg + vid.stab, no network, result saved to the gallery.
+Steady out shaky phone videos, right on your Android phone. Pick a video (or share one to
+Staydee from your gallery), tap **Stabilize**, and the smooth version lands in your gallery.
+Nothing is uploaded: no account, no internet, no ads.
 
 Status: early development. Plan: [docs/stabilize-android-plan.md](docs/stabilize-android-plan.md).
+
+## Features
+
+- Works offline: your videos never leave the phone.
+- Three simple controls: how much shake to remove, how smooth the camera path should be, and quality.
+- Side-by-side compare of the original and the stabilized video.
+- Runs in the background with a progress notification and a time estimate.
+- Saves to `Movies/Staydee`, visible in any gallery app; HDR videos are converted to SDR.
+- Advanced settings (zoom, borders, tripod mode, output size, audio, sharpening) for those who want them.
+
+## Install
+
+Download the latest `staydee-<version>.apk` from [Releases](https://github.com/pradigunara/staydee/releases)
+and install it. Needs Android 10 or newer on a 64-bit ARM phone (almost every phone from the last
+several years).
+
+## How it works
+
+Two passes with [FFmpeg](https://ffmpeg.org) and [vid.stab](https://github.com/georgmartius/vid.stab):
+the first analyzes the camera motion, the second smooths it and re-encodes with x264. The app is
+Kotlin and Jetpack Compose.
 
 ## Build
 
