@@ -1,7 +1,9 @@
 package io.github.pradigunara.staydee.ui
 
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -56,8 +58,8 @@ fun MainScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp),
         ) {
             when (val job = ui.job) {
                 JobState.Idle -> IdleForm(
@@ -96,67 +98,80 @@ private fun IdleForm(
     val s = ui.settings
     SourceCard(ui, onPick)
 
-    Heading(stringResource(R.string.heading_stabilize), Modifier.padding(top = 12.dp))
-    IntKnob(
-        title = stringResource(R.string.knob_shakiness),
-        value = s.shakiness,
-        range = 1..10,
-        summary = stringResource(R.string.knob_shakiness_summary),
-        onCommit = { onSettingsChange(s.copy(shakiness = it)) },
-    )
-    IntKnob(
-        title = stringResource(R.string.knob_smoothing),
-        value = s.smoothing,
-        range = 0..1000,
-        summary = stringResource(R.string.knob_smoothing_summary),
-        onCommit = { onSettingsChange(s.copy(smoothing = it)) },
-    )
-    IntKnob(
-        title = stringResource(R.string.knob_crf),
-        value = s.crf,
-        range = 0..51,
-        summary = stringResource(R.string.knob_crf_summary),
-        onCommit = { onSettingsChange(s.copy(crf = it)) },
-    )
-    ArrowKnob(
-        title = stringResource(R.string.advanced_open),
-        summary = stringResource(R.string.advanced_summary),
-        onClick = onAdvanced,
-    )
-    s.reconciled().warnings.forEach { Caption(it, Modifier.padding(vertical = 2.dp)) }
-
-    val estimate = ui.estimateSeconds
-    if (estimate != null) {
-        Caption(stringResource(R.string.estimate_value, formatSeconds(context, estimate)), Modifier.padding(top = 12.dp))
-    } else if (ui.probe != null) {
-        Caption(stringResource(R.string.estimate_unknown), Modifier.padding(top = 12.dp))
-    }
-    PrimaryButton(
-        text = stringResource(R.string.run),
-        enabled = ui.source != null && ui.probe != null,
-        onClick = onRun,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    )
-    if (onDiagnostics != null) {
-        TextAction(
-            text = stringResource(R.string.diagnostics),
-            onClick = onDiagnostics,
-            modifier = Modifier.fillMaxWidth(),
+    Heading(stringResource(R.string.heading_stabilize))
+    KnobGroup(Modifier.padding(horizontal = CARD_INSET).fillMaxWidth()) {
+        IntKnob(
+            title = stringResource(R.string.knob_shakiness),
+            value = s.shakiness,
+            range = 1..10,
+            summary = stringResource(R.string.knob_shakiness_summary),
+            onCommit = { onSettingsChange(s.copy(shakiness = it)) },
+        )
+        IntKnob(
+            title = stringResource(R.string.knob_smoothing),
+            value = s.smoothing,
+            range = 0..1000,
+            summary = stringResource(R.string.knob_smoothing_summary),
+            onCommit = { onSettingsChange(s.copy(smoothing = it)) },
+        )
+        IntKnob(
+            title = stringResource(R.string.knob_crf),
+            value = s.crf,
+            range = 0..51,
+            summary = stringResource(R.string.knob_crf_summary),
+            onCommit = { onSettingsChange(s.copy(crf = it)) },
+        )
+        ArrowKnob(
+            title = stringResource(R.string.advanced_open),
+            summary = stringResource(R.string.advanced_summary),
+            onClick = onAdvanced,
         )
     }
+
+    val textRow = Modifier.padding(horizontal = TEXT_INSET)
+    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        s.reconciled().warnings.forEach { Caption(it, textRow) }
+        val estimate = ui.estimateSeconds
+        if (estimate != null) {
+            Caption(stringResource(R.string.estimate_value, formatSeconds(context, estimate)), textRow)
+        } else if (ui.probe != null) {
+            Caption(stringResource(R.string.estimate_unknown), textRow)
+        }
+    }
+    ActionColumn {
+        PrimaryButton(
+            text = stringResource(R.string.run),
+            enabled = ui.source != null && ui.probe != null,
+            onClick = onRun,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (onDiagnostics != null) {
+            TextAction(text = stringResource(R.string.diagnostics), onClick = onDiagnostics, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** Buttons below the cards: card-aligned, with a consistent gap between them. */
+@Composable
+private fun ActionColumn(content: @Composable () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = CARD_INSET).padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) { content() }
 }
 
 @Composable
 private fun SourceCard(ui: MainUi, onPick: () -> Unit) {
     val context = LocalContext.current
     val probe = ui.probe
-    InfoCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Heading(stringResource(R.string.heading_video))
+    InfoCard(Modifier.padding(horizontal = CARD_INSET).fillMaxWidth()) {
         when {
             ui.source == null -> BodyText(stringResource(R.string.source_none))
             ui.probeError != null -> BodyText(stringResource(R.string.source_unreadable, ui.probeError))
             probe == null -> {
                 BodyText(stringResource(R.string.source_reading))
-                ProgressBar(null, Modifier.fillMaxWidth().padding(top = 8.dp))
+                ProgressBar(null, Modifier.padding(top = 4.dp))
             }
             else -> {
                 BodyText(probe.displayName)
@@ -167,22 +182,28 @@ private fun SourceCard(ui: MainUi, onPick: () -> Unit) {
                 if (probe.transfer.isHdr) Caption(stringResource(R.string.source_hdr))
             }
         }
-        TextAction(text = stringResource(R.string.choose_video), onClick = onPick)
+        SecondaryButton(
+            text = stringResource(if (ui.source == null) R.string.choose_video else R.string.choose_other_video),
+            onClick = onPick,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
     }
 }
 
 @Composable
 private fun RunningPanel(job: JobState.Running, onCancel: () -> Unit) {
     val context = LocalContext.current
-    Heading(stringResource(R.string.running_title), Modifier.padding(top = 12.dp))
-    InfoCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Heading(stringResource(R.string.running_title))
+    InfoCard(Modifier.padding(horizontal = CARD_INSET).fillMaxWidth()) {
         BodyText(stringResource(stageLabel(job.stage)))
         ProgressBar(job.progress, Modifier.fillMaxWidth().padding(vertical = 8.dp))
         job.estimateSeconds?.let {
             Caption(stringResource(R.string.estimate_value, formatSeconds(context, it)))
         }
     }
-    TextAction(text = stringResource(R.string.cancel), onClick = onCancel, modifier = Modifier.fillMaxWidth())
+    ActionColumn {
+        SecondaryButton(text = stringResource(R.string.cancel), onClick = onCancel, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 @Composable
@@ -194,31 +215,32 @@ private fun DonePanel(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    Heading(stringResource(R.string.done_title), Modifier.padding(top = 12.dp))
-    InfoCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Heading(stringResource(R.string.done_title))
+    InfoCard(Modifier.padding(horizontal = CARD_INSET).fillMaxWidth()) {
         BodyText(job.displayName)
         Caption(stringResource(R.string.done_saved))
         Caption(stringResource(R.string.done_took, formatSeconds(context, job.elapsedSeconds)))
-        job.warnings.forEach { Caption(it, Modifier.padding(top = 4.dp)) }
+        job.warnings.forEach { Caption(it) }
     }
-    PrimaryButton(
-        text = stringResource(R.string.open),
-        enabled = true,
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    )
-    TextAction(text = stringResource(R.string.compare), onClick = onCompare, modifier = Modifier.fillMaxWidth())
-    TextAction(text = stringResource(R.string.share), onClick = onShare, modifier = Modifier.fillMaxWidth())
-    TextAction(text = stringResource(R.string.dismiss), onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+    ActionColumn {
+        PrimaryButton(text = stringResource(R.string.open), enabled = true, onClick = onOpen, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryButton(text = stringResource(R.string.compare), onClick = onCompare, modifier = Modifier.weight(1f))
+            SecondaryButton(text = stringResource(R.string.share), onClick = onShare, modifier = Modifier.weight(1f))
+        }
+        TextAction(text = stringResource(R.string.dismiss), onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 @Composable
 private fun ResultMessage(title: String, detail: String?, onDismiss: () -> Unit) {
-    Heading(title, Modifier.padding(top = 12.dp))
+    Heading(title)
     if (detail != null) {
-        InfoCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) { BodyText(detail) }
+        InfoCard(Modifier.padding(horizontal = CARD_INSET).fillMaxWidth()) { BodyText(detail) }
     }
-    TextAction(text = stringResource(R.string.dismiss), onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+    ActionColumn {
+        SecondaryButton(text = stringResource(R.string.dismiss), onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 private fun stageLabel(stage: JobState.Stage): Int = when (stage) {

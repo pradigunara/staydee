@@ -20,7 +20,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import com.arthenica.ffmpegkit.FFmpegKit
+import io.github.pradigunara.staydee.pipeline.NativeTools
 import io.github.pradigunara.staydee.core.DETECT_FLOOR
 import io.github.pradigunara.staydee.core.Settings
 import io.github.pradigunara.staydee.core.detectChain
@@ -38,7 +38,7 @@ import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/** M0 diagnostics (debug builds only): device/AAR report and the transform repeatability check (plan §8). */
+/** Diagnostics (debug builds only): bundled-ffmpeg report and the transform repeatability check (plan §8). */
 @Composable
 fun DiagnosticsHost() {
     val context = LocalContext.current
@@ -47,7 +47,7 @@ fun DiagnosticsHost() {
     var job by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) {
-        val report = withContext(Dispatchers.IO) { DiagnosticsReport.build() }
+        val report = withContext(Dispatchers.IO) { DiagnosticsReport.build(context) }
         state = state.copy(report = report)
     }
 
@@ -75,10 +75,8 @@ fun DiagnosticsHost() {
         title = stringResource(R.string.app_name),
         state = state,
         onRepeatability = { picker.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) },
-        onCancel = {
-            FFmpegKit.cancel()
-            job?.cancel()
-        },
+        // cancelling the job kills the running ffmpeg process
+        onCancel = { job?.cancel() },
         onShare = { share(context, state.report + "\n" + state.log) },
         onExportTrf = {
             scope.launch {
@@ -91,9 +89,9 @@ fun DiagnosticsHost() {
     )
 }
 
-private fun repeatability(context: Context, uri: Uri, log: (String) -> Unit) {
+private suspend fun repeatability(context: Context, uri: Uri, log: (String) -> Unit) {
     val work = File(context.cacheDir, "m0").apply { deleteRecursively(); mkdirs() }
-    // a local copy: SAF descriptors are single-use, and every run re-reads the input
+    // a local copy: every run re-reads the input, and MediaMetadataRetriever needs a path
     val src = File(work, "input")
     log("copying input…")
     context.contentResolver.openInputStream(uri)!!.use { input -> src.outputStream().use { input.copyTo(it) } }
@@ -114,7 +112,7 @@ private fun repeatability(context: Context, uri: Uri, log: (String) -> Unit) {
 
     val settings = Settings(sharpen = false) // transform only: no unsharp, no x264
     val edges = listOf(DETECT_FLOOR, longEdge).distinct().filter { it <= longEdge }
-    val runner = Repeatability(work, log)
+    val runner = Repeatability(NativeTools.ffmpeg(context), work, log)
     val results = edges.map { edge ->
         val scale = scaleIfShrinking(edge, longEdge)
         runner.measure(
