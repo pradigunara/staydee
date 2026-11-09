@@ -48,8 +48,8 @@ android {
         applicationId = "io.github.pradigunara.staydee"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.0.2"
+        versionCode = 8
+        versionName = "0.0.3"
         ndk { abiFilters += "arm64-v8a" }
     }
 
